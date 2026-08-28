@@ -29,12 +29,12 @@ function Racha({ resultados }) {
     return <span className="text-xs text-muted">—</span>;
   }
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       {resultados.map((r, i) => (
         <span
           key={i}
           title={`${NOMBRE_CATEGORIA[r.categoria]} (${r.valor} pts Biwenger)`}
-          className="flex h-5 min-w-[1.6rem] items-center justify-center rounded-md px-1 text-[10px] font-bold text-black"
+          className="flex h-3.5 min-w-[1.1rem] items-center justify-center rounded px-0.5 text-[8px] font-bold text-black"
           style={ESTILO_POR_CATEGORIA[r.categoria]}
         >
           {r.categoria}
