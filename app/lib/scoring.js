@@ -177,6 +177,11 @@ export function generarCalendarioDobleVuelta(teamIds) {
 }
 
 const HISTORIAL_VACIO = { titulos: 0, campeonVigenteLiga: false };
+// Peso por título combinado entre los dos equipos — tiene que poder pesar
+// más que el bonus fijo de "campeón vigente" (5) cuando el clásico es lo
+// bastante grande, si no un cruce de 12 títulos combinados pierde contra
+// uno de 4 solo por ser el campeón actual el que juega.
+const PESO_POR_TITULO = 1;
 
 /**
  * Elige el "Partido de la Jornada" entre los enfrentamientos de una
@@ -215,7 +220,7 @@ export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId, h
 
     const gap = Math.abs(posA - posB);
     const bonusCampeon = puntosCampeon(histA) + puntosCampeon(histB);
-    const pesoHistorico = (histA.titulos + histB.titulos) * 0.5;
+    const pesoHistorico = (histA.titulos + histB.titulos) * PESO_POR_TITULO;
     const importancia =
       (totalEquipos + 1 - posA) + (totalEquipos + 1 - posB) - gap * 0.5 + bonusCampeon + pesoHistorico;
 
@@ -242,7 +247,8 @@ export function elegirPartidoPorHistorial(fixturesDeJornada, historial) {
   fixturesDeJornada.forEach((f, index) => {
     const histA = historial.get(f.teamAId) ?? HISTORIAL_VACIO;
     const histB = historial.get(f.teamBId) ?? HISTORIAL_VACIO;
-    const puntuacion = puntosCampeon(histA) + puntosCampeon(histB) + (histA.titulos + histB.titulos) * 0.5;
+    const puntuacion =
+      puntosCampeon(histA) + puntosCampeon(histB) + (histA.titulos + histB.titulos) * PESO_POR_TITULO;
 
     if (puntuacion > 0 && (!mejor || puntuacion > mejor.puntuacion)) {
       mejor = { index, puntuacion, histA, histB };
