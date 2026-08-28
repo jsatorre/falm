@@ -1,13 +1,46 @@
 import { supabase } from "./supabaseServer";
-import { getAllTeamsRoundPoints } from "./integrations/biwenger";
+import { getAllTeamsRoundPoints, getSeasonRounds } from "./integrations/biwenger";
+
+/**
+ * El estado de cada jornada (pendiente/cerrada) viene del calendario
+ * público de Biwenger — hay que refrescarlo en cada sync, si no se queda
+ * congelado en lo que fuera cuando se sembró la base de datos y la
+ * pantalla "en directo" no avanza nunca de jornada aunque pasen semanas.
+ */
+async function syncEstadosDeJornada() {
+  const [seasonRounds, { data: rounds, error }] = await Promise.all([
+    getSeasonRounds(),
+    supabase.from("rounds").select("id, biwenger_round_id, status"),
+  ]);
+  if (error) throw error;
+
+  const estadoPorBiwengerId = new Map(seasonRounds.map((r) => [String(r.id), r.status]));
+  const cambios = rounds
+    .filter((r) => {
+      const nuevo = estadoPorBiwengerId.get(String(r.biwenger_round_id));
+      return nuevo && nuevo !== r.status;
+    })
+    .map((r) => ({ id: r.id, status: estadoPorBiwengerId.get(String(r.biwenger_round_id)) }));
+
+  for (const cambio of cambios) {
+    const { error: updateError } = await supabase
+      .from("rounds")
+      .update({ status: cambio.status })
+      .eq("id", cambio.id);
+    if (updateError) throw updateError;
+  }
+}
 
 /**
  * Trae de Biwenger los puntos de TODAS las jornadas para TODOS los
  * equipos (12 llamadas en paralelo, cada una ya trae el histórico
- * completo de esa "manager") y los vuelca en `round_results`. Se puede
- * llamar tan a menudo como haga falta — es upsert puro, idempotente.
+ * completo de esa "manager") y los vuelca en `round_results`, y de paso
+ * refresca qué jornadas ha cerrado ya Biwenger. Se puede llamar tan a
+ * menudo como haga falta — es upsert puro, idempotente.
  */
 export async function syncBiwengerResults() {
+  await syncEstadosDeJornada();
+
   const { data: teams, error: teamsError } = await supabase
     .from("teams")
     .select("id, biwenger_user_id");
