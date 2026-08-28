@@ -51,6 +51,13 @@ export default async function NavBar() {
               <span>{equipo.name}</span>
             </span>
           )}
+          <Link
+            href="/admin"
+            title="Admin"
+            className="rounded-full border border-border px-2.5 py-1.5 text-xs text-muted transition hover:border-neon-purple hover:text-neon-purple"
+          >
+            ⚙️
+          </Link>
           <LogoutButton />
         </div>
       </div>
