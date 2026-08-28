@@ -26,6 +26,7 @@ create table if not exists rounds (
     jornada integer not null,
     status text not null default 'pending' check (status in ('pending', 'live', 'finished')),
     closed_at timestamptz,
+    fichajes_deadline timestamptz,
     created_at timestamptz not null default now(),
     unique (season_id, jornada)
 );

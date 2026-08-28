@@ -1,5 +1,6 @@
 import { getCaraACaraRounds } from "../lib/caraACaraRounds";
 import AplazarJornadaForm from "./AplazarJornadaForm";
+import FichajesDeadlineForm from "./FichajesDeadlineForm";
 import AdminLogoutButton from "./AdminLogoutButton";
 
 export default async function AdminPage() {
@@ -24,6 +25,18 @@ export default async function AdminPage() {
           la numeración interna (Jornada 1, 2, 3...) se recalcula sola, no hace falta tocar nada más.
         </p>
         <AplazarJornadaForm />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Hora tope de fichajes
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Se aplica a la próxima jornada de fichajes (la más cercana que todavía está pendiente).
+          En cuanto pase esa hora, la siguiente vez que alguien entre en Fichajes se calculan y
+          publican las asignaciones automáticamente.
+        </p>
+        <FichajesDeadlineForm />
       </section>
 
       <section>

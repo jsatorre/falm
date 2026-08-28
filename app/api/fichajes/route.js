@@ -1,6 +1,7 @@
 import { COOKIE_NAME, equipoDeSesion } from "../../lib/auth";
 import { supabase } from "../../lib/supabaseServer";
 import { getCaraACaraRounds } from "../../lib/caraACaraRounds";
+import { publicarFichajesSiToca, deadlinePasada } from "../../lib/fichajesEngine";
 
 function equipoAutenticado(request) {
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
@@ -23,7 +24,24 @@ export async function GET(request) {
 
   const ronda = await rondaDeFichajesActual();
   if (!ronda) {
-    return Response.json({ player1: "", player2: "", cerrado: true });
+    return Response.json({ player1: "", player2: "", cerrado: true, publicado: false });
+  }
+
+  if (deadlinePasada(ronda)) {
+    const asignaciones = await publicarFichajesSiToca(ronda);
+    const { data: teams } = await supabase.from("teams").select("id, name, crest_url");
+    const equipoPorId = Object.fromEntries(teams.map((t) => [t.id, t]));
+
+    return Response.json({
+      cerrado: false,
+      publicado: true,
+      deadline: ronda.fichajes_deadline,
+      asignaciones: asignaciones.map((a) => ({
+        team: equipoPorId[a.team_id] ?? null,
+        player: a.player,
+        esTuyo: a.team_id === teamId,
+      })),
+    });
   }
 
   const { data } = await supabase
@@ -33,7 +51,13 @@ export async function GET(request) {
     .eq("team_id", teamId)
     .maybeSingle();
 
-  return Response.json({ player1: data?.player_1 ?? "", player2: data?.player_2 ?? "", cerrado: false });
+  return Response.json({
+    player1: data?.player_1 ?? "",
+    player2: data?.player_2 ?? "",
+    cerrado: false,
+    publicado: false,
+    deadline: ronda.fichajes_deadline,
+  });
 }
 
 export async function POST(request) {
@@ -45,6 +69,9 @@ export async function POST(request) {
   const ronda = await rondaDeFichajesActual();
   if (!ronda) {
     return Response.json({ error: "No hay ventana de fichajes abierta" }, { status: 409 });
+  }
+  if (deadlinePasada(ronda)) {
+    return Response.json({ error: "Ya se ha cerrado la ventana de fichajes de esta jornada" }, { status: 409 });
   }
 
   const { player1, player2 } = await request.json();
