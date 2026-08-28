@@ -9,7 +9,6 @@
   --neon-green: #22ff9a;
   --neon-orange: #ff8a3d;
   --neon-pink: #ff2fb0;
-  --neon-red: #ff5c5c;
   --border: #26263a;
 }
 
@@ -19,7 +18,6 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-neon-purple: var(--neon-purple);
-  --color-neon-red: var(--neon-red);
   --color-neon-green: var(--neon-green);
   --color-neon-orange: var(--neon-orange);
   --color-neon-pink: var(--neon-pink);

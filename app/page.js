@@ -5,14 +5,23 @@ import CelebrateButton from "./components/CelebrateButton";
 
 const MEDALLAS = ["🥇", "🥈", "🥉"];
 
-// Victoria clara/ajustada en verdes distintos, empate técnico en naranja,
-// derrota ajustada/clara en rojos distintos.
+// Colores propios (no los "neon" del resto de la app, que quedaban
+// deslavados a media opacidad) — un verde y un rojo distintos de verdad
+// para clara/ajustada, más un ámbar para el empate técnico.
 const ESTILO_POR_CATEGORIA = {
-  3: { backgroundColor: "var(--neon-green)" },
-  2: { backgroundColor: "var(--neon-green)", opacity: 0.55 },
-  1.5: { backgroundColor: "var(--neon-orange)" },
-  1: { backgroundColor: "var(--neon-red)", opacity: 0.55 },
-  0: { backgroundColor: "var(--neon-red)" },
+  3: { backgroundColor: "#22c55e" }, // victoria clara
+  2: { backgroundColor: "#86efac" }, // victoria ajustada
+  1.5: { backgroundColor: "#fbbf24" }, // empate técnico
+  1: { backgroundColor: "#fca5a5" }, // derrota ajustada
+  0: { backgroundColor: "#ef4444" }, // derrota clara
+};
+
+const NOMBRE_CATEGORIA = {
+  3: "victoria clara",
+  2: "victoria ajustada",
+  1.5: "empate técnico",
+  1: "derrota ajustada",
+  0: "derrota clara",
 };
 
 function Racha({ resultados }) {
@@ -24,11 +33,11 @@ function Racha({ resultados }) {
       {resultados.map((r, i) => (
         <span
           key={i}
-          title={`Jornada: ${r.valor} pts`}
+          title={`${NOMBRE_CATEGORIA[r.categoria]} (${r.valor} pts Biwenger)`}
           className="flex h-5 min-w-[1.6rem] items-center justify-center rounded-md px-1 text-[10px] font-bold text-black"
           style={ESTILO_POR_CATEGORIA[r.categoria]}
         >
-          {r.valor}
+          {r.categoria}
         </span>
       ))}
     </div>
