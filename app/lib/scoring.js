@@ -179,18 +179,22 @@ export function generarCalendarioDobleVuelta(teamIds) {
 /**
  * Elige el "Partido de la Jornada" entre los enfrentamientos de una
  * jornada, a partir de la clasificación ANTES de jugarse esa jornada (lo
- * que había en juego al pitar el inicio, no el resultado). Prioriza
- * cruces entre equipos bien situados y, entre esos, los más apretados
- * (una posición de diferencia pesa más que estar los dos arriba pero muy
- * separados).
+ * que había en juego al pitar el inicio, no el resultado), más el peso
+ * histórico del palmarés: si alguno de los dos es el campeón vigente
+ * (liga o copa de la temporada anterior) o entre los dos suman muchos
+ * títulos, el cruce sube en el ranking aunque no estén cerca en la tabla
+ * esta temporada.
  *
  * @param {Array<{teamAId: string, teamBId: string}>} fixturesDeJornada
  * @param {Map<string, number>} posicionPorEquipoId  1 = primero
+ * @param {Map<string, {campeonVigente: boolean, titulos: number}>} [historial]
  * @returns {{ index: number, motivo: string } | null}
  */
-export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId) {
+export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId, historial = new Map()) {
   const totalEquipos = posicionPorEquipoId.size;
   if (totalEquipos === 0) return null;
+
+  const datosHistorial = (teamId) => historial.get(teamId) ?? { campeonVigente: false, titulos: 0 };
 
   let mejor = null;
 
@@ -199,19 +203,29 @@ export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId) {
     const posB = posicionPorEquipoId.get(f.teamBId);
     if (posA == null || posB == null) return;
 
+    const histA = datosHistorial(f.teamAId);
+    const histB = datosHistorial(f.teamBId);
+
     const gap = Math.abs(posA - posB);
-    const importancia = (totalEquipos + 1 - posA) + (totalEquipos + 1 - posB) - gap * 0.5;
+    const bonusCampeon = (histA.campeonVigente ? 5 : 0) + (histB.campeonVigente ? 5 : 0);
+    const pesoHistorico = (histA.titulos + histB.titulos) * 0.5;
+    const importancia =
+      (totalEquipos + 1 - posA) + (totalEquipos + 1 - posB) - gap * 0.5 + bonusCampeon + pesoHistorico;
 
     if (!mejor || importancia > mejor.importancia) {
-      mejor = { index, importancia, posA, posB, gap };
+      mejor = { index, importancia, posA, posB, gap, histA, histB };
     }
   });
 
   if (!mejor) return null;
 
-  const { posA, posB, gap } = mejor;
+  const { posA, posB, gap, histA, histB } = mejor;
   let motivo;
-  if (posA <= 3 && posB <= 3) {
+  if (histA.campeonVigente || histB.campeonVigente) {
+    motivo = "El campeón vigente defiende el trono";
+  } else if (histA.titulos + histB.titulos >= 5) {
+    motivo = "Clásico entre los más laureados de la liga";
+  } else if (posA <= 3 && posB <= 3) {
     motivo = "Choque de arriba de la tabla";
   } else if (gap === 1) {
     motivo = "Se juegan la posición directamente";
@@ -220,6 +234,39 @@ export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId) {
   } else {
     motivo = "El cruce con más en juego de la jornada";
   }
+
+  return { index: mejor.index, motivo };
+}
+
+/**
+ * Variante para cuando no hay clasificación previa que consultar (jornada
+ * 1 de la temporada): destaca un cruce solo si el palmarés da pie a ello
+ * (campeón vigente o clásico entre laureados), nunca por posiciones.
+ *
+ * @param {Array<{teamAId: string, teamBId: string}>} fixturesDeJornada
+ * @param {Map<string, {campeonVigente: boolean, titulos: number}>} historial
+ * @returns {{ index: number, motivo: string } | null}
+ */
+export function elegirPartidoPorHistorial(fixturesDeJornada, historial) {
+  let mejor = null;
+
+  fixturesDeJornada.forEach((f, index) => {
+    const histA = historial.get(f.teamAId) ?? { campeonVigente: false, titulos: 0 };
+    const histB = historial.get(f.teamBId) ?? { campeonVigente: false, titulos: 0 };
+    const puntuacion =
+      (histA.campeonVigente ? 5 : 0) + (histB.campeonVigente ? 5 : 0) + (histA.titulos + histB.titulos) * 0.5;
+
+    if (puntuacion > 0 && (!mejor || puntuacion > mejor.puntuacion)) {
+      mejor = { index, puntuacion, histA, histB };
+    }
+  });
+
+  if (!mejor) return null;
+
+  const motivo =
+    mejor.histA.campeonVigente || mejor.histB.campeonVigente
+      ? "El campeón vigente defiende el trono"
+      : "Clásico entre los más laureados de la liga";
 
   return { index: mejor.index, motivo };
 }

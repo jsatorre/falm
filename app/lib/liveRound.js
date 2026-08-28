@@ -1,14 +1,14 @@
 import { supabase } from "./supabaseServer";
 import { getCaraACaraRounds } from "./caraACaraRounds";
-import { calcularClasificacion, elegirPartidoDestacado } from "./scoring";
+import { calcularClasificacion, elegirPartidoDestacado, elegirPartidoPorHistorial } from "./scoring";
 
 /**
  * Snapshot de la jornada cara a cara "en directo" (la próxima no cerrada,
  * o la última si la temporada ya terminó sus 22 jornadas): equipos,
  * puntos Biwenger actuales de cada uno, y cuál es el "Partido de la
- * Jornada" según la clasificación que había ANTES de empezar esa jornada.
- * No sincroniza con Biwenger — eso lo hace quien llame a esto primero (ver
- * app/lib/sync.js).
+ * Jornada" según la clasificación que había ANTES de empezar esa jornada
+ * más el peso del palmarés histórico. No sincroniza con Biwenger — eso lo
+ * hace quien llame a esto primero (ver app/lib/sync.js).
  */
 export async function getRondaEnDirecto() {
   const rounds = await getCaraACaraRounds();
@@ -21,12 +21,14 @@ export async function getRondaEnDirecto() {
     { data: teams },
     { data: todosFixturesRaw },
     { data: todosResultsRaw },
+    { data: trophies },
   ] = await Promise.all([
     supabase.from("fixtures").select("team_a_id, team_b_id").eq("round_id", ronda.id),
     supabase.from("round_results").select("team_id, biwenger_points").eq("round_id", ronda.id),
     supabase.from("teams").select("id, name, crest_url"),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
     supabase.from("round_results").select("round_id, team_id, biwenger_points"),
+    supabase.from("trophies").select("season_label, champion_team_id"),
   ]);
 
   const equipoPorId = Object.fromEntries(teams.map((t) => [t.id, t]));
@@ -41,18 +43,52 @@ export async function getRondaEnDirecto() {
     pointsB: puntosPorEquipo[f.team_b_id] ?? null,
   }));
 
-  marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw, todosResultsRaw);
+  marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw, todosResultsRaw, trophies);
 
   return { jornada: ronda.jornadaCaraACara, status: ronda.status, fixtures };
 }
 
+// Cuántos títulos (ligas + copas) tiene cada equipo ACTUAL en el palmarés,
+// y si es el campeón vigente (de la temporada más reciente registrada) de
+// alguna de las dos competiciones. Solo cuentan los títulos ya enlazados a
+// un equipo actual (champion_team_id) — los de equipos de temporadas
+// pasadas que ya no existen no aportan peso a ningún cruce de hoy.
+function construirHistorial(trophies) {
+  const conEquipoActual = trophies.filter((t) => t.champion_team_id);
+  if (conEquipoActual.length === 0) return new Map();
+
+  const temporadaMasReciente = conEquipoActual.reduce(
+    (max, t) => (t.season_label > max ? t.season_label : max),
+    conEquipoActual[0].season_label
+  );
+
+  const historial = new Map();
+  for (const t of conEquipoActual) {
+    const actual = historial.get(t.champion_team_id) ?? { campeonVigente: false, titulos: 0 };
+    actual.titulos += 1;
+    if (t.season_label === temporadaMasReciente) actual.campeonVigente = true;
+    historial.set(t.champion_team_id, actual);
+  }
+  return historial;
+}
+
 // Calcula la clasificación tal y como estaba justo antes de esta jornada
-// (jornadaCaraACara - 1) y usa esas posiciones para decidir qué cruce de
-// la jornada en directo es el "Partido de la Jornada" (ver
-// elegirPartidoDestacado en scoring.js). Marca el fixture elegido in-place
-// con { destacado: true, motivo }.
-function marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw, todosResultsRaw) {
-  if (ronda.jornadaCaraACara <= 1) return; // nada que consultar todavía
+// (jornadaCaraACara - 1) y, junto con el palmarés histórico, decide qué
+// cruce de la jornada en directo es el "Partido de la Jornada" (ver
+// scoring.js). Marca el fixture elegido in-place con { destacado, motivo }.
+function marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw, todosResultsRaw, trophies) {
+  const historial = construirHistorial(trophies);
+
+  if (ronda.jornadaCaraACara <= 1) {
+    // Todavía no hay clasificación de esta temporada — solo el palmarés
+    // puede justificar un destacado (campeón vigente / clásico).
+    const elegido = elegirPartidoPorHistorial(fixtures, historial);
+    if (elegido) {
+      fixtures[elegido.index].destacado = true;
+      fixtures[elegido.index].motivo = elegido.motivo;
+    }
+    return;
+  }
 
   const jornadaPorRoundId = new Map(rounds.map((r) => [r.id, r.jornadaCaraACara]));
 
@@ -80,7 +116,7 @@ function marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw
   );
   const posicionPorEquipoId = new Map(clasificacionPrevia.map((fila, i) => [fila.team.id, i + 1]));
 
-  const elegido = elegirPartidoDestacado(fixtures, posicionPorEquipoId);
+  const elegido = elegirPartidoDestacado(fixtures, posicionPorEquipoId, historial);
   if (elegido) {
     fixtures[elegido.index].destacado = true;
     fixtures[elegido.index].motivo = elegido.motivo;
