@@ -62,11 +62,18 @@ create table if not exists fichaje_assignments (
     assigned_at timestamptz not null default now()
 );
 
+-- champion_team_id es opcional: equipos de temporadas antiguas (p.ej.
+-- "Ratatuich", "Albelmala") ya no existen como equipo actual en Biwenger,
+-- así que el nombre del campeón se guarda siempre en champion_name y solo
+-- se enlaza a un equipo actual (para mostrar su escudo) cuando coincide.
 create table if not exists trophies (
     id uuid primary key default gen_random_uuid(),
     season_label text not null,
-    champion_team_id uuid not null references teams(id),
-    note text
+    competition text not null check (competition in ('liga', 'copa')),
+    champion_name text not null,
+    champion_team_id uuid references teams(id),
+    note text,
+    unique (season_label, competition)
 );
 
 create table if not exists records (
