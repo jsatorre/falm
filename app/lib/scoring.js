@@ -96,7 +96,10 @@ export function calcularClasificacion(teams, fixtures, results, hastaJornada) {
     dp: r.pf - r.pc,
     mp: r.pj > 0 ? r.pf / r.pj : 0,
     jg: r.jg,
-    racha: [...r.partidos].sort((a, b) => a.jornada - b.jornada).slice(-5).map((p) => p.puntos),
+    racha: [...r.partidos]
+      .sort((a, b) => a.jornada - b.jornada)
+      .slice(-5)
+      .map((p) => ({ categoria: p.puntos, valor: p.puntosAFavor })),
   }));
 
   filas.sort((a, b) => b.pts - a.pts || b.pf - a.pf);
@@ -113,7 +116,7 @@ function aplicarResultado(tabla, teamId, puntosAFavor, puntosEnContra, jornada) 
   r.pj += 1;
   r.pf += puntosAFavor;
   r.pc += puntosEnContra;
-  r.partidos.push({ jornada, puntos });
+  r.partidos.push({ jornada, puntos, puntosAFavor });
 
   if (puntos === 3) r.pg += 1;
   else if (puntos === 2) r.vm += 1;
