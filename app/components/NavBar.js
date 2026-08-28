@@ -25,7 +25,7 @@ export default async function NavBar() {
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
           <span className="text-lg">⚽</span>
-          <span className="hidden sm:inline">Liga de Amigos</span>
+          <span className="hidden sm:inline">FALM</span>
         </div>
 
         <nav className="flex items-center gap-1 rounded-full border border-border bg-background-elevated p-1">

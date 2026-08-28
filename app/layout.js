@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Liga de Amigos — Biwenger",
-  description: "Clasificación, jornada en directo y fichajes de la liga.",
+  title: "FALM",
+  description: "Clasificación, jornada en directo y fichajes de la liga FALM.",
 };
 
 export default function RootLayout({ children }) {
