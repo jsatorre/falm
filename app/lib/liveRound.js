@@ -1,6 +1,11 @@
 import { supabase } from "./supabaseServer";
 import { getCaraACaraRounds } from "./caraACaraRounds";
-import { calcularClasificacion, elegirPartidoDestacado, elegirPartidoPorHistorial } from "./scoring";
+import {
+  calcularClasificacion,
+  elegirPartidoDestacado,
+  elegirPartidoPorHistorial,
+  formatearMotivoDestacado,
+} from "./scoring";
 
 /**
  * Snapshot de la jornada cara a cara "en directo" (la próxima no cerrada,
@@ -28,7 +33,7 @@ export async function getRondaEnDirecto() {
     supabase.from("teams").select("id, name, crest_url"),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
     supabase.from("round_results").select("round_id, team_id, biwenger_points"),
-    supabase.from("trophies").select("season_label, champion_team_id"),
+    supabase.from("trophies").select("season_label, competition, champion_team_id"),
   ]);
 
   const equipoPorId = Object.fromEntries(teams.map((t) => [t.id, t]));
@@ -49,10 +54,12 @@ export async function getRondaEnDirecto() {
 }
 
 // Cuántos títulos (ligas + copas) tiene cada equipo ACTUAL en el palmarés,
-// y si es el campeón vigente (de la temporada más reciente registrada) de
-// alguna de las dos competiciones. Solo cuentan los títulos ya enlazados a
-// un equipo actual (champion_team_id) — los de equipos de temporadas
-// pasadas que ya no existen no aportan peso a ningún cruce de hoy.
+// y de cuál de las dos competiciones (liga y/o copa) es campeón vigente
+// (de la temporada más reciente registrada) — para no confundir "campeón
+// de Liga" con "campeón de Copa" en el motivo. Solo cuentan los títulos ya
+// enlazados a un equipo actual (champion_team_id) — los de equipos de
+// temporadas pasadas que ya no existen no aportan peso a ningún cruce de
+// hoy.
 function construirHistorial(trophies) {
   const conEquipoActual = trophies.filter((t) => t.champion_team_id);
   if (conEquipoActual.length === 0) return new Map();
@@ -64,9 +71,16 @@ function construirHistorial(trophies) {
 
   const historial = new Map();
   for (const t of conEquipoActual) {
-    const actual = historial.get(t.champion_team_id) ?? { campeonVigente: false, titulos: 0 };
+    const actual = historial.get(t.champion_team_id) ?? {
+      titulos: 0,
+      campeonVigenteLiga: false,
+      campeonVigenteCopa: false,
+    };
     actual.titulos += 1;
-    if (t.season_label === temporadaMasReciente) actual.campeonVigente = true;
+    if (t.season_label === temporadaMasReciente) {
+      if (t.competition === "liga") actual.campeonVigenteLiga = true;
+      if (t.competition === "copa") actual.campeonVigenteCopa = true;
+    }
     historial.set(t.champion_team_id, actual);
   }
   return historial;
@@ -78,15 +92,22 @@ function construirHistorial(trophies) {
 // scoring.js). Marca el fixture elegido in-place con { destacado, motivo }.
 function marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw, todosResultsRaw, trophies) {
   const historial = construirHistorial(trophies);
+  const equipoPorId = Object.fromEntries(teams.map((t) => [t.id, t]));
+
+  function marcar(elegido) {
+    if (!elegido) return;
+    const fixture = fixtures[elegido.index];
+    fixture.destacado = true;
+    fixture.motivo = formatearMotivoDestacado(elegido, {
+      nombreA: equipoPorId[fixture.teamAId]?.name ?? "",
+      nombreB: equipoPorId[fixture.teamBId]?.name ?? "",
+    });
+  }
 
   if (ronda.jornadaCaraACara <= 1) {
     // Todavía no hay clasificación de esta temporada — solo el palmarés
     // puede justificar un destacado (campeón vigente / clásico).
-    const elegido = elegirPartidoPorHistorial(fixtures, historial);
-    if (elegido) {
-      fixtures[elegido.index].destacado = true;
-      fixtures[elegido.index].motivo = elegido.motivo;
-    }
+    marcar(elegirPartidoPorHistorial(fixtures, historial));
     return;
   }
 
@@ -116,9 +137,5 @@ function marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw
   );
   const posicionPorEquipoId = new Map(clasificacionPrevia.map((fila, i) => [fila.team.id, i + 1]));
 
-  const elegido = elegirPartidoDestacado(fixtures, posicionPorEquipoId, historial);
-  if (elegido) {
-    fixtures[elegido.index].destacado = true;
-    fixtures[elegido.index].motivo = elegido.motivo;
-  }
+  marcar(elegirPartidoDestacado(fixtures, posicionPorEquipoId, historial));
 }

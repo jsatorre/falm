@@ -176,6 +176,8 @@ export function generarCalendarioDobleVuelta(teamIds) {
   return [...ida, ...vuelta];
 }
 
+const HISTORIAL_VACIO = { titulos: 0, campeonVigenteLiga: false, campeonVigenteCopa: false };
+
 /**
  * Elige el "Partido de la Jornada" entre los enfrentamientos de una
  * jornada, a partir de la clasificación ANTES de jugarse esa jornada (lo
@@ -185,16 +187,18 @@ export function generarCalendarioDobleVuelta(teamIds) {
  * títulos, el cruce sube en el ranking aunque no estén cerca en la tabla
  * esta temporada.
  *
+ * No arma el texto del motivo (para eso hace falta el nombre de los
+ * equipos, que esto no conoce) — devuelve los datos crudos para que quien
+ * llame construya la frase. Ver formatearMotivoDestacado.
+ *
  * @param {Array<{teamAId: string, teamBId: string}>} fixturesDeJornada
  * @param {Map<string, number>} posicionPorEquipoId  1 = primero
- * @param {Map<string, {campeonVigente: boolean, titulos: number}>} [historial]
- * @returns {{ index: number, motivo: string } | null}
+ * @param {Map<string, {titulos: number, campeonVigenteLiga: boolean, campeonVigenteCopa: boolean}>} [historial]
+ * @returns {{ index: number, posA: number, posB: number, gap: number, totalEquipos: number, histA: object, histB: object } | null}
  */
 export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId, historial = new Map()) {
   const totalEquipos = posicionPorEquipoId.size;
   if (totalEquipos === 0) return null;
-
-  const datosHistorial = (teamId) => historial.get(teamId) ?? { campeonVigente: false, titulos: 0 };
 
   let mejor = null;
 
@@ -203,39 +207,21 @@ export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId, h
     const posB = posicionPorEquipoId.get(f.teamBId);
     if (posA == null || posB == null) return;
 
-    const histA = datosHistorial(f.teamAId);
-    const histB = datosHistorial(f.teamBId);
+    const histA = historial.get(f.teamAId) ?? HISTORIAL_VACIO;
+    const histB = historial.get(f.teamBId) ?? HISTORIAL_VACIO;
 
     const gap = Math.abs(posA - posB);
-    const bonusCampeon = (histA.campeonVigente ? 5 : 0) + (histB.campeonVigente ? 5 : 0);
+    const bonusCampeon = puntosCampeon(histA) + puntosCampeon(histB);
     const pesoHistorico = (histA.titulos + histB.titulos) * 0.5;
     const importancia =
       (totalEquipos + 1 - posA) + (totalEquipos + 1 - posB) - gap * 0.5 + bonusCampeon + pesoHistorico;
 
     if (!mejor || importancia > mejor.importancia) {
-      mejor = { index, importancia, posA, posB, gap, histA, histB };
+      mejor = { index, importancia, posA, posB, gap, totalEquipos, histA, histB };
     }
   });
 
-  if (!mejor) return null;
-
-  const { posA, posB, gap, histA, histB } = mejor;
-  let motivo;
-  if (histA.campeonVigente || histB.campeonVigente) {
-    motivo = "El campeón vigente defiende el trono";
-  } else if (histA.titulos + histB.titulos >= 5) {
-    motivo = "Clásico entre los más laureados de la liga";
-  } else if (posA <= 3 && posB <= 3) {
-    motivo = "Choque de arriba de la tabla";
-  } else if (gap === 1) {
-    motivo = "Se juegan la posición directamente";
-  } else if (posA >= totalEquipos - 2 && posB >= totalEquipos - 2) {
-    motivo = "Duelo por no ser el farolillo rojo";
-  } else {
-    motivo = "El cruce con más en juego de la jornada";
-  }
-
-  return { index: mejor.index, motivo };
+  return mejor;
 }
 
 /**
@@ -244,29 +230,67 @@ export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId, h
  * (campeón vigente o clásico entre laureados), nunca por posiciones.
  *
  * @param {Array<{teamAId: string, teamBId: string}>} fixturesDeJornada
- * @param {Map<string, {campeonVigente: boolean, titulos: number}>} historial
- * @returns {{ index: number, motivo: string } | null}
+ * @param {Map<string, {titulos: number, campeonVigenteLiga: boolean, campeonVigenteCopa: boolean}>} historial
+ * @returns {{ index: number, histA: object, histB: object } | null}
  */
 export function elegirPartidoPorHistorial(fixturesDeJornada, historial) {
   let mejor = null;
 
   fixturesDeJornada.forEach((f, index) => {
-    const histA = historial.get(f.teamAId) ?? { campeonVigente: false, titulos: 0 };
-    const histB = historial.get(f.teamBId) ?? { campeonVigente: false, titulos: 0 };
-    const puntuacion =
-      (histA.campeonVigente ? 5 : 0) + (histB.campeonVigente ? 5 : 0) + (histA.titulos + histB.titulos) * 0.5;
+    const histA = historial.get(f.teamAId) ?? HISTORIAL_VACIO;
+    const histB = historial.get(f.teamBId) ?? HISTORIAL_VACIO;
+    const puntuacion = puntosCampeon(histA) + puntosCampeon(histB) + (histA.titulos + histB.titulos) * 0.5;
 
     if (puntuacion > 0 && (!mejor || puntuacion > mejor.puntuacion)) {
       mejor = { index, puntuacion, histA, histB };
     }
   });
 
-  if (!mejor) return null;
+  return mejor;
+}
 
-  const motivo =
-    mejor.histA.campeonVigente || mejor.histB.campeonVigente
-      ? "El campeón vigente defiende el trono"
-      : "Clásico entre los más laureados de la liga";
+function puntosCampeon(hist) {
+  return (hist.campeonVigenteLiga ? 5 : 0) + (hist.campeonVigenteCopa ? 5 : 0);
+}
 
-  return { index: mejor.index, motivo };
+/**
+ * Construye el texto del "Partido de la Jornada" a partir de lo que
+ * devuelven elegirPartidoDestacado/elegirPartidoPorHistorial, con los
+ * nombres reales de los equipos.
+ *
+ * @param {{ posA?: number, posB?: number, gap?: number, totalEquipos?: number, histA: object, histB: object }} elegido
+ * @param {{ nombreA: string, nombreB: string }} nombres
+ */
+export function formatearMotivoDestacado(elegido, { nombreA, nombreB }) {
+  const { histA, histB } = elegido;
+
+  const tituloDe = (hist) => {
+    if (hist.campeonVigenteLiga && hist.campeonVigenteCopa) return "Liga y Copa";
+    if (hist.campeonVigenteLiga) return "Liga";
+    if (hist.campeonVigenteCopa) return "Copa";
+    return null;
+  };
+
+  const tituloA = tituloDe(histA);
+  const tituloB = tituloDe(histB);
+
+  if (tituloA && tituloB) {
+    return `Choque entre el campeón de ${tituloA} (${nombreA}) y el de ${tituloB} (${nombreB})`;
+  }
+  if (tituloA) {
+    return `${nombreA} defiende su título de ${tituloA}`;
+  }
+  if (tituloB) {
+    return `${nombreB} defiende su título de ${tituloB}`;
+  }
+  if (histA.titulos + histB.titulos >= 5) {
+    return "Clásico entre los más laureados de la liga";
+  }
+
+  const { posA, posB, gap, totalEquipos } = elegido;
+  if (posA == null || posB == null) return "El cruce con más en juego de la jornada";
+  if (posA <= 3 && posB <= 3) return "Choque de arriba de la tabla";
+  if (gap === 1) return "Se juegan la posición directamente";
+  if (posA >= totalEquipos - 2 && posB >= totalEquipos - 2) return "Duelo por no ser el farolillo rojo";
+  return "El cruce con más en juego de la jornada";
 }
