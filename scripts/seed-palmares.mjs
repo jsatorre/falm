@@ -26,7 +26,7 @@ const HISTORIAL = [
   ["2018/2019", "Ratatuich", "Buitres"],
   ["2017/2018", "Ròtova", null],
   ["2016/2017", "Marcando el kaki", "Rabos vaskos"],
-  ["2015/2016", "Albelmala", null],
+  ["2015/2016", "Albelmala", "Parrusal"],
   ["2014/2015", "Xavaleo", "Ròtova"],
   ["2013/2014", "Ròtova", "Chanatinaikos"],
   ["2012/2013", "Parrusal", "Chanatinaikos"],
@@ -44,13 +44,17 @@ function normaliza(s) {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+const EQUIVALENCIAS_NORMALIZADAS = Object.fromEntries(
+  Object.entries(EQUIVALENCIAS).map(([k, v]) => [normaliza(k), v])
+);
+
 async function main() {
   const { data: teams, error: teamsError } = await supabase.from("teams").select("id, name");
   if (teamsError) throw teamsError;
   const teamIdPorNombreActual = new Map(teams.map((t) => [normaliza(t.name), t.id]));
 
   function idEquipoActual(nombreHistorico) {
-    const actual = EQUIVALENCIAS[normaliza(nombreHistorico)];
+    const actual = EQUIVALENCIAS_NORMALIZADAS[normaliza(nombreHistorico)];
     if (!actual) return null;
     return teamIdPorNombreActual.get(normaliza(actual)) ?? null;
   }
