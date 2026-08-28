@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { COOKIE_NAME, equipoDeSesion } from "./app/lib/auth";
+import { ADMIN_COOKIE_NAME, esSesionAdminValida } from "./app/lib/adminAuth";
 
-const RUTAS_PUBLICAS = ["/login", "/api/auth/login"];
+const RUTAS_PUBLICAS = ["/login", "/api/auth/login", "/admin/login", "/api/admin/login"];
 
 function esRutaPublica(pathname) {
   return RUTAS_PUBLICAS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
+
+function esRutaAdmin(pathname) {
+  return pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin/");
 }
 
 export default function proxy(request) {
@@ -12,6 +17,18 @@ export default function proxy(request) {
 
   if (esRutaPublica(pathname)) {
     return NextResponse.next();
+  }
+
+  // /admin va con su propia sesión (contraseña única, independiente de los
+  // PIN de equipo) — nunca se mezcla con la lógica de abajo.
+  if (esRutaAdmin(pathname)) {
+    const cookieAdmin = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+    if (esSesionAdminValida(cookieAdmin)) {
+      return NextResponse.next();
+    }
+    const loginUrl = new URL("/admin/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
