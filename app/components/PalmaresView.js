@@ -62,7 +62,7 @@ export default function PalmaresView({ equipos }) {
                 <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
                   <th className="px-3 py-2 font-medium">Equipo</th>
                   <th className="px-3 py-2 text-right font-medium">Ligas</th>
-                  <th className="px-3 py-2 text-right font-medium">Copas</th>
+                  <th className="px-3 py-2 text-right font-medium">Sudden</th>
                   <th className="px-3 py-2 text-right font-medium">Títulos</th>
                 </tr>
               </thead>
@@ -115,7 +115,7 @@ export default function PalmaresView({ equipos }) {
               >
                 <span className="w-20 shrink-0 font-semibold text-foreground">{season}</span>
                 <TituloInline icono="🏆" etiqueta="Liga" titulo={liga} />
-                <TituloInline icono="⚡" etiqueta="Copa" titulo={copa} />
+                <TituloInline icono="⚡" etiqueta="Sudden" titulo={copa} />
               </div>
             ))}
           </div>
@@ -219,7 +219,7 @@ function TrophyForm({ equipos, onSaved }) {
           className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-neon-purple"
         >
           <option value="liga">Liga</option>
-          <option value="copa">Copa / Sudden Death</option>
+          <option value="copa">Sudden Death League</option>
         </select>
       </label>
       <Campo label="Campeón" value={championName} onChange={setChampionName} placeholder="Nombre del equipo" />

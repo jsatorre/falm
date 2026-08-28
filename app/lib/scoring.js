@@ -176,16 +176,19 @@ export function generarCalendarioDobleVuelta(teamIds) {
   return [...ida, ...vuelta];
 }
 
-const HISTORIAL_VACIO = { titulos: 0, campeonVigenteLiga: false, campeonVigenteCopa: false };
+const HISTORIAL_VACIO = { titulos: 0, campeonVigenteLiga: false };
 
 /**
  * Elige el "Partido de la Jornada" entre los enfrentamientos de una
  * jornada, a partir de la clasificación ANTES de jugarse esa jornada (lo
  * que había en juego al pitar el inicio, no el resultado), más el peso
- * histórico del palmarés: si alguno de los dos es el campeón vigente
- * (liga o copa de la temporada anterior) o entre los dos suman muchos
- * títulos, el cruce sube en el ranking aunque no estén cerca en la tabla
- * esta temporada.
+ * histórico del palmarés: si alguno de los dos es el campeón de Liga
+ * vigente o entre los dos suman muchos títulos (de Liga o de la Sudden
+ * Death League), el cruce sube en el ranking aunque no estén cerca en la
+ * tabla esta temporada. Solo se mira el título de LIGA para "quién
+ * defiende el trono" — la Sudden Death League no se juega en paralelo a
+ * esta liga cara a cara, así que "defender" ese título aquí no tendría
+ * sentido; sí suma como peso histórico general (rivalidad/prestigio).
  *
  * No arma el texto del motivo (para eso hace falta el nombre de los
  * equipos, que esto no conoce) — devuelve los datos crudos para que quien
@@ -193,7 +196,7 @@ const HISTORIAL_VACIO = { titulos: 0, campeonVigenteLiga: false, campeonVigenteC
  *
  * @param {Array<{teamAId: string, teamBId: string}>} fixturesDeJornada
  * @param {Map<string, number>} posicionPorEquipoId  1 = primero
- * @param {Map<string, {titulos: number, campeonVigenteLiga: boolean, campeonVigenteCopa: boolean}>} [historial]
+ * @param {Map<string, {titulos: number, campeonVigenteLiga: boolean}>} [historial]
  * @returns {{ index: number, posA: number, posB: number, gap: number, totalEquipos: number, histA: object, histB: object } | null}
  */
 export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId, historial = new Map()) {
@@ -230,7 +233,7 @@ export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId, h
  * (campeón vigente o clásico entre laureados), nunca por posiciones.
  *
  * @param {Array<{teamAId: string, teamBId: string}>} fixturesDeJornada
- * @param {Map<string, {titulos: number, campeonVigenteLiga: boolean, campeonVigenteCopa: boolean}>} historial
+ * @param {Map<string, {titulos: number, campeonVigenteLiga: boolean}>} historial
  * @returns {{ index: number, histA: object, histB: object } | null}
  */
 export function elegirPartidoPorHistorial(fixturesDeJornada, historial) {
@@ -250,7 +253,7 @@ export function elegirPartidoPorHistorial(fixturesDeJornada, historial) {
 }
 
 function puntosCampeon(hist) {
-  return (hist.campeonVigenteLiga ? 5 : 0) + (hist.campeonVigenteCopa ? 5 : 0);
+  return hist.campeonVigenteLiga ? 5 : 0;
 }
 
 /**
@@ -264,25 +267,10 @@ function puntosCampeon(hist) {
 export function formatearMotivoDestacado(elegido, { nombreA, nombreB }) {
   const { histA, histB } = elegido;
 
-  const tituloDe = (hist) => {
-    if (hist.campeonVigenteLiga && hist.campeonVigenteCopa) return "Liga y Copa";
-    if (hist.campeonVigenteLiga) return "Liga";
-    if (hist.campeonVigenteCopa) return "Copa";
-    return null;
-  };
-
-  const tituloA = tituloDe(histA);
-  const tituloB = tituloDe(histB);
-
-  if (tituloA && tituloB) {
-    return `Choque entre el campeón de ${tituloA} (${nombreA}) y el de ${tituloB} (${nombreB})`;
-  }
-  if (tituloA) {
-    return `${nombreA} defiende su título de ${tituloA}`;
-  }
-  if (tituloB) {
-    return `${nombreB} defiende su título de ${tituloB}`;
-  }
+  // Solo el título de LIGA cuenta como "defender el trono" — la Sudden
+  // Death League no se juega en paralelo a esta liga cara a cara.
+  if (histA.campeonVigenteLiga) return `${nombreA} defiende su título de Liga`;
+  if (histB.campeonVigenteLiga) return `${nombreB} defiende su título de Liga`;
   if (histA.titulos + histB.titulos >= 5) {
     return "Clásico entre los más laureados de la liga";
   }

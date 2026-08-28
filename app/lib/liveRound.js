@@ -53,10 +53,12 @@ export async function getRondaEnDirecto() {
   return { jornada: ronda.jornadaCaraACara, status: ronda.status, fixtures };
 }
 
-// Cuántos títulos (ligas + copas) tiene cada equipo ACTUAL en el palmarés,
-// y de cuál de las dos competiciones (liga y/o copa) es campeón vigente
-// (de la temporada más reciente registrada) — para no confundir "campeón
-// de Liga" con "campeón de Copa" en el motivo. Solo cuentan los títulos ya
+// Cuántos títulos (Liga + Sudden Death League) tiene cada equipo ACTUAL en
+// el palmarés, y si es el campeón de LIGA vigente (temporada más reciente
+// registrada) — solo Liga, porque la Sudden Death League no se juega en
+// paralelo a esta liga cara a cara y "defender" ese título aquí no
+// tendría sentido; los títulos de Sudden sí cuentan para el peso
+// histórico general (rivalidad/prestigio). Solo cuentan títulos ya
 // enlazados a un equipo actual (champion_team_id) — los de equipos de
 // temporadas pasadas que ya no existen no aportan peso a ningún cruce de
 // hoy.
@@ -71,15 +73,10 @@ function construirHistorial(trophies) {
 
   const historial = new Map();
   for (const t of conEquipoActual) {
-    const actual = historial.get(t.champion_team_id) ?? {
-      titulos: 0,
-      campeonVigenteLiga: false,
-      campeonVigenteCopa: false,
-    };
+    const actual = historial.get(t.champion_team_id) ?? { titulos: 0, campeonVigenteLiga: false };
     actual.titulos += 1;
-    if (t.season_label === temporadaMasReciente) {
-      if (t.competition === "liga") actual.campeonVigenteLiga = true;
-      if (t.competition === "copa") actual.campeonVigenteCopa = true;
+    if (t.season_label === temporadaMasReciente && t.competition === "liga") {
+      actual.campeonVigenteLiga = true;
     }
     historial.set(t.champion_team_id, actual);
   }
