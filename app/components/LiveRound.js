@@ -68,30 +68,40 @@ export default function LiveRound({ inicial }) {
               : null;
 
           return (
-            <div
-              key={`${f.teamA.id}-${f.teamB.id}`}
-              className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl border border-border bg-background-elevated px-4 py-4"
-            >
-              <EquipoEnDirecto
-                equipo={f.teamA}
-                puntos={f.pointsA}
-                ganando={puntosA != null && puntosA > puntosB}
-                align="right"
-              />
-
-              <div className="flex flex-col items-center gap-1 px-2">
-                <span className="text-[10px] uppercase tracking-widest text-muted">
-                  {jugando ? "jugando" : "cerrado"}
+            <div key={`${f.teamA.id}-${f.teamB.id}`} className="flex flex-col gap-1.5">
+              {f.destacado && (
+                <span className="flex items-center gap-1.5 self-start rounded-full bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+                  ⭐ Partido de la jornada — {f.motivo}
                 </span>
-                <span className="text-lg font-black text-muted">vs</span>
-              </div>
+              )}
+              <div
+                className={`grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl border bg-background-elevated px-4 ${
+                  f.destacado ? "glow-gold border-amber-400/60 py-5" : "border-border py-4"
+                }`}
+              >
+                <EquipoEnDirecto
+                  equipo={f.teamA}
+                  puntos={f.pointsA}
+                  ganando={puntosA != null && puntosA > puntosB}
+                  align="right"
+                  grande={f.destacado}
+                />
 
-              <EquipoEnDirecto
-                equipo={f.teamB}
-                puntos={f.pointsB}
-                ganando={puntosB != null && puntosB > puntosA}
-                align="left"
-              />
+                <div className="flex flex-col items-center gap-1 px-2">
+                  <span className="text-[10px] uppercase tracking-widest text-muted">
+                    {jugando ? "jugando" : "cerrado"}
+                  </span>
+                  <span className="text-lg font-black text-muted">vs</span>
+                </div>
+
+                <EquipoEnDirecto
+                  equipo={f.teamB}
+                  puntos={f.pointsB}
+                  ganando={puntosB != null && puntosB > puntosA}
+                  align="left"
+                  grande={f.destacado}
+                />
+              </div>
             </div>
           );
         })}
@@ -100,15 +110,23 @@ export default function LiveRound({ inicial }) {
   );
 }
 
-function EquipoEnDirecto({ equipo, puntos, ganando, align }) {
+function EquipoEnDirecto({ equipo, puntos, ganando, align, grande }) {
   const derecha = align === "right";
   return (
     <div className={`flex items-center gap-2.5 ${derecha ? "flex-row-reverse text-right" : "text-left"}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={equipo.crest_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+      <img
+        src={equipo.crest_url}
+        alt=""
+        className={`rounded-full object-cover ${grande ? "h-11 w-11" : "h-9 w-9"}`}
+      />
       <div className={`flex flex-col ${derecha ? "items-end" : "items-start"}`}>
         <span className="text-xs font-medium text-foreground sm:text-sm">{equipo.name}</span>
-        <span className={`text-2xl font-black ${ganando ? "text-neon-green" : "text-muted"}`}>
+        <span
+          className={`font-black ${grande ? "text-3xl" : "text-2xl"} ${
+            ganando ? "text-neon-green" : "text-muted"
+          }`}
+        >
           {puntos ?? "—"}
         </span>
       </div>

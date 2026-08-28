@@ -104,7 +104,6 @@ export default async function ClasificacionPage() {
             <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
               <th className="px-3 py-3 font-medium">#</th>
               <th className="px-3 py-3 font-medium">Equipo</th>
-              <th className="px-3 py-3 font-medium">Racha</th>
               <th className="px-3 py-3 text-right font-medium">PJ</th>
               <th className="px-3 py-3 text-right font-medium">Pts</th>
               <th className="px-3 py-3 text-right font-medium">PF</th>
@@ -112,6 +111,7 @@ export default async function ClasificacionPage() {
               <th className="px-3 py-3 text-right font-medium">DP</th>
               <th className="px-3 py-3 text-right font-medium">MP</th>
               <th className="px-3 py-3 text-right font-medium">🏅 JG</th>
+              <th className="px-3 py-3 font-medium">Racha</th>
             </tr>
           </thead>
           <tbody>
@@ -132,9 +132,6 @@ export default async function ClasificacionPage() {
                     </span>
                   </span>
                 </td>
-                <td className="px-3 py-3">
-                  <Racha resultados={fila.racha} />
-                </td>
                 <td className="px-3 py-3 text-right text-muted">{fila.pj}</td>
                 <td className="px-3 py-3 text-right font-bold text-neon-green">{fila.pts}</td>
                 <td className="px-3 py-3 text-right text-muted">{fila.pf}</td>
@@ -144,6 +141,9 @@ export default async function ClasificacionPage() {
                 </td>
                 <td className="px-3 py-3 text-right text-muted">{fila.mp.toFixed(1)}</td>
                 <td className="px-3 py-3 text-right text-muted">{fila.jg}</td>
+                <td className="px-3 py-3">
+                  <Racha resultados={fila.racha} />
+                </td>
               </tr>
             ))}
           </tbody>

@@ -175,3 +175,51 @@ export function generarCalendarioDobleVuelta(teamIds) {
 
   return [...ida, ...vuelta];
 }
+
+/**
+ * Elige el "Partido de la Jornada" entre los enfrentamientos de una
+ * jornada, a partir de la clasificación ANTES de jugarse esa jornada (lo
+ * que había en juego al pitar el inicio, no el resultado). Prioriza
+ * cruces entre equipos bien situados y, entre esos, los más apretados
+ * (una posición de diferencia pesa más que estar los dos arriba pero muy
+ * separados).
+ *
+ * @param {Array<{teamAId: string, teamBId: string}>} fixturesDeJornada
+ * @param {Map<string, number>} posicionPorEquipoId  1 = primero
+ * @returns {{ index: number, motivo: string } | null}
+ */
+export function elegirPartidoDestacado(fixturesDeJornada, posicionPorEquipoId) {
+  const totalEquipos = posicionPorEquipoId.size;
+  if (totalEquipos === 0) return null;
+
+  let mejor = null;
+
+  fixturesDeJornada.forEach((f, index) => {
+    const posA = posicionPorEquipoId.get(f.teamAId);
+    const posB = posicionPorEquipoId.get(f.teamBId);
+    if (posA == null || posB == null) return;
+
+    const gap = Math.abs(posA - posB);
+    const importancia = (totalEquipos + 1 - posA) + (totalEquipos + 1 - posB) - gap * 0.5;
+
+    if (!mejor || importancia > mejor.importancia) {
+      mejor = { index, importancia, posA, posB, gap };
+    }
+  });
+
+  if (!mejor) return null;
+
+  const { posA, posB, gap } = mejor;
+  let motivo;
+  if (posA <= 3 && posB <= 3) {
+    motivo = "Choque de arriba de la tabla";
+  } else if (gap === 1) {
+    motivo = "Se juegan la posición directamente";
+  } else if (posA >= totalEquipos - 2 && posB >= totalEquipos - 2) {
+    motivo = "Duelo por no ser el farolillo rojo";
+  } else {
+    motivo = "El cruce con más en juego de la jornada";
+  }
+
+  return { index: mejor.index, motivo };
+}

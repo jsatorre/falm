@@ -39,6 +39,10 @@ body {
   box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 24px rgba(168, 85, 247, 0.25);
 }
 
+.glow-gold {
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.5), 0 0 28px rgba(251, 191, 36, 0.25);
+}
+
 .glow-green {
   box-shadow: 0 0 0 1px rgba(34, 255, 154, 0.4), 0 0 24px rgba(34, 255, 154, 0.2);
 }
