@@ -26,6 +26,7 @@ const fila = () => ({
   pf: 0, // puntos Biwenger a favor
   pc: 0, // puntos Biwenger en contra
   jg: 0, // jornadas ganadas (máximo individual de la jornada)
+  partidos: [], // [{ jornada, puntos }] en el orden en que se van jugando, para la racha
 });
 
 /**
@@ -55,8 +56,8 @@ export function calcularClasificacion(teams, fixtures, results, hastaJornada) {
     const ptsB = resultadosJornada[f.teamBId];
     if (ptsA == null || ptsB == null) continue; // jornada sin cerrar todavía
 
-    aplicarResultado(tabla, f.teamAId, ptsA, ptsB);
-    aplicarResultado(tabla, f.teamBId, ptsB, ptsA);
+    aplicarResultado(tabla, f.teamAId, ptsA, ptsB, f.jornada);
+    aplicarResultado(tabla, f.teamBId, ptsB, ptsA, f.jornada);
   }
 
   // Segunda pasada: jornada ganada (JG) = mayor puntuación Biwenger
@@ -95,6 +96,7 @@ export function calcularClasificacion(teams, fixtures, results, hastaJornada) {
     dp: r.pf - r.pc,
     mp: r.pj > 0 ? r.pf / r.pj : 0,
     jg: r.jg,
+    racha: [...r.partidos].sort((a, b) => a.jornada - b.jornada).slice(-5).map((p) => p.puntos),
   }));
 
   filas.sort((a, b) => b.pts - a.pts || b.pf - a.pf);
@@ -102,7 +104,7 @@ export function calcularClasificacion(teams, fixtures, results, hastaJornada) {
   return filas;
 }
 
-function aplicarResultado(tabla, teamId, puntosAFavor, puntosEnContra) {
+function aplicarResultado(tabla, teamId, puntosAFavor, puntosEnContra, jornada) {
   const r = tabla.get(teamId);
   if (!r) return;
   const puntos = calcularPuntosEnfrentamiento(puntosAFavor, puntosEnContra);
@@ -111,6 +113,7 @@ function aplicarResultado(tabla, teamId, puntosAFavor, puntosEnContra) {
   r.pj += 1;
   r.pf += puntosAFavor;
   r.pc += puntosEnContra;
+  r.partidos.push({ jornada, puntos });
 
   if (puntos === 3) r.pg += 1;
   else if (puntos === 2) r.vm += 1;

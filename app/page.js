@@ -5,6 +5,32 @@ import CelebrateButton from "./components/CelebrateButton";
 
 const MEDALLAS = ["🥇", "🥈", "🥉"];
 
+const ESTILO_POR_PUNTOS = {
+  3: { backgroundColor: "var(--neon-green)" },
+  2: { backgroundColor: "var(--neon-green)", opacity: 0.45 },
+  1.5: { backgroundColor: "var(--neon-orange)" },
+  1: { backgroundColor: "var(--neon-orange)", opacity: 0.45 },
+  0: { backgroundColor: "var(--neon-pink)" },
+};
+
+function Racha({ resultados }) {
+  if (resultados.length === 0) {
+    return <span className="text-xs text-muted">—</span>;
+  }
+  return (
+    <div className="flex items-center gap-1">
+      {resultados.map((puntos, i) => (
+        <span
+          key={i}
+          title={`${puntos} pts`}
+          className="h-2.5 w-2.5 rounded-full"
+          style={ESTILO_POR_PUNTOS[puntos]}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default async function ClasificacionPage() {
   const [rounds, { data: teams }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
     getCaraACaraRounds(),
@@ -72,6 +98,7 @@ export default async function ClasificacionPage() {
               <th className="px-3 py-3 text-right font-medium">DP</th>
               <th className="px-3 py-3 text-right font-medium">MP</th>
               <th className="px-3 py-3 text-right font-medium">🏅 JG</th>
+              <th className="px-3 py-3 font-medium">Racha</th>
             </tr>
           </thead>
           <tbody>
@@ -101,6 +128,9 @@ export default async function ClasificacionPage() {
                 </td>
                 <td className="px-3 py-3 text-right text-muted">{fila.mp.toFixed(1)}</td>
                 <td className="px-3 py-3 text-right text-muted">{fila.jg}</td>
+                <td className="px-3 py-3">
+                  <Racha resultados={fila.racha} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -110,7 +140,8 @@ export default async function ClasificacionPage() {
       <p className="mt-4 text-xs text-muted">
         Pts: 3 victoria clara · 2 victoria ajustada · 1.5 empate técnico (±1) ·
         1 derrota ajustada · 0 derrota clara. JG: jornadas en las que has sido
-        el que más puntos Biwenger ha sacado esa semana.
+        el que más puntos Biwenger ha sacado esa semana. Racha: tus últimos 5
+        enfrentamientos, de más antiguo (izquierda) a más reciente (derecha).
       </p>
     </main>
   );
