@@ -14,10 +14,6 @@ export default async function ClasificacionPage() {
   ]);
 
   const jornadaCaraACaraPorRoundId = new Map(rounds.map((r) => [r.id, r.jornadaCaraACara]));
-  const ultimaJornadaCerrada = Math.max(
-    0,
-    ...rounds.filter((r) => r.status === "finished").map((r) => r.jornadaCaraACara)
-  );
 
   const fixtures = fixturesRaw
     .filter((f) => jornadaCaraACaraPorRoundId.has(f.round_id))
@@ -34,8 +30,18 @@ export default async function ClasificacionPage() {
     results[r.round_id][r.team_id] = r.biwenger_points;
   }
 
+  // La clasificación cuenta cualquier enfrentamiento con resultado en
+  // ambos lados, sin exigir que la jornada entera esté "cerrada" en
+  // Biwenger — así un partido que termina antes que otro de la misma
+  // jornada ya cuenta, y no hace falta esperar a que Biwenger marque la
+  // jornada completa como finalizada.
   const equipos = teams.map((t) => ({ id: t.id, name: t.name, crestUrl: t.crest_url }));
-  const clasificacion = calcularClasificacion(equipos, fixtures, results, ultimaJornadaCerrada);
+  const clasificacion = calcularClasificacion(equipos, fixtures, results);
+
+  const jornadasConResultado = fixtures
+    .filter((f) => results[f.roundId]?.[f.teamAId] != null && results[f.roundId]?.[f.teamBId] != null)
+    .map((f) => f.jornada);
+  const ultimaJornadaConDatos = jornadasConResultado.length > 0 ? Math.max(...jornadasConResultado) : 0;
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
@@ -45,9 +51,9 @@ export default async function ClasificacionPage() {
             Clasificación
           </p>
           <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-            {ultimaJornadaCerrada > 0
-              ? `Después de la jornada ${ultimaJornadaCerrada}`
-              : "Todavía no hay jornadas cerradas"}
+            {ultimaJornadaConDatos > 0
+              ? `Después de la jornada ${ultimaJornadaConDatos}`
+              : "Todavía no hay resultados"}
           </h1>
         </div>
         <CelebrateButton />
