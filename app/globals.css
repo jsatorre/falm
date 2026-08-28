@@ -1,26 +1,94 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a12;
+  --background-elevated: #14141f;
+  --foreground: #f4f4ff;
+  --muted: #9797b8;
+  --neon-purple: #a855f7;
+  --neon-green: #22ff9a;
+  --neon-orange: #ff8a3d;
+  --neon-pink: #ff2fb0;
+  --border: #26263a;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-elevated: var(--background-elevated);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-neon-purple: var(--neon-purple);
+  --color-neon-green: var(--neon-green);
+  --color-neon-orange: var(--neon-orange);
+  --color-neon-pink: var(--neon-pink);
+  --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(168, 85, 247, 0.18), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(34, 255, 154, 0.12), transparent 40%),
+    var(--background);
+  color: var(--foreground);
+  min-height: 100%;
+}
+
+.glow-purple {
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 24px rgba(168, 85, 247, 0.25);
+}
+
+.glow-green {
+  box-shadow: 0 0 0 1px rgba(34, 255, 154, 0.4), 0 0 24px rgba(34, 255, 154, 0.2);
+}
+
+@keyframes pulse-live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.pulse-live {
+  animation: pulse-live 1.4s ease-in-out infinite;
+}
+
+@keyframes float-up {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.float-up {
+  animation: float-up 0.4s ease-out both;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(540deg);
+    opacity: 0;
+  }
+}
+
+.confetti-piece {
+  position: fixed;
+  top: 0;
+  width: 8px;
+  height: 14px;
+  animation: confetti-fall linear forwards;
+  pointer-events: none;
+  z-index: 50;
 }

@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Liga de Amigos — Biwenger
 
-## Getting Started
+App que sustituye la Sheet + Apps Script de la liga de amigos: clasificación
+con puntuación propia, jornada en directo y fichajes privados por equipo.
+Mismo stack que `reposiciones-app` (Next.js 16, React 19, Tailwind 4,
+Supabase), pero en cuentas Vercel/Supabase **personales**, separadas de las
+de Trendsplant.
 
-First, run the development server:
+## Estado: Fase 1 (mock, sin backend real)
+
+Todo lo que hay ahora corre con datos de mentira en `app/lib/mockData.js` —
+no hay Supabase ni Biwenger conectados todavía. Sirve para validar el flujo
+completo (login por PIN, clasificación, jornada en directo, fichajes
+privados) y el estilo visual antes de depender de cuentas/credenciales.
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+PIN de prueba para entrar con cualquier equipo: **1234**.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Pendiente para Fase 2 (bloqueos)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Cuenta Vercel personal (email distinto del de trabajo) — conectar este
+   repo cuando exista.
+2. Cuenta + proyecto Supabase personal — ejecutar `app/lib/schema.sql` ahí.
+3. Credenciales de Biwenger (email + contraseña de la cuenta que está en la
+   liga) para `BIWENGER_EMAIL`/`BIWENGER_PASSWORD`, y el ID numérico de la
+   liga — con eso se implementa `app/lib/integrations/biwenger.js` (login +
+   clasificación real de liga) y se sustituye el mock.
 
-## Learn More
+## Estructura
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/lib/scoring.js` — motor de puntos 3/2/1.5/1/0 y cálculo de
+  clasificación (puerto de `calcularPuntos`/`actualizarClasificacion` del
+  Apps Script original), más el generador de calendario round-robin.
+- `app/lib/fichajes.js` — algoritmo de prioridades de fichajes (puerto de
+  `asignarFichajesConPrioridades`).
+- `app/lib/auth.js` + `proxy.js` — sesión por equipo (PIN), cookie firmada
+  con HMAC (`SESSION_SECRET`), cada equipo solo ve su propio wishlist.
+- `app/lib/schema.sql` — esquema para cuando exista el Supabase real.

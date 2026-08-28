@@ -1,65 +1,110 @@
-import Image from "next/image";
+import { calcularClasificacion } from "./lib/scoring";
+import { supabase } from "./lib/supabaseServer";
+import CelebrateButton from "./components/CelebrateButton";
 
-export default function Home() {
+const MEDALLAS = ["🥇", "🥈", "🥉"];
+
+export default async function ClasificacionPage() {
+  const [{ data: teams }, { data: rounds }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
+    supabase.from("teams").select("id, name, crest_url"),
+    supabase.from("rounds").select("id, jornada, status").lte("jornada", 22),
+    supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
+    supabase.from("round_results").select("round_id, team_id, biwenger_points"),
+  ]);
+
+  const jornadaPorRoundId = new Map(rounds.map((r) => [r.id, r.jornada]));
+  const ultimaJornadaCerrada = Math.max(
+    0,
+    ...rounds.filter((r) => r.status === "finished").map((r) => r.jornada)
+  );
+
+  const fixtures = fixturesRaw
+    .filter((f) => jornadaPorRoundId.has(f.round_id))
+    .map((f) => ({
+      roundId: f.round_id,
+      jornada: jornadaPorRoundId.get(f.round_id),
+      teamAId: f.team_a_id,
+      teamBId: f.team_b_id,
+    }));
+
+  const results = {};
+  for (const r of resultsRaw) {
+    results[r.round_id] ??= {};
+    results[r.round_id][r.team_id] = r.biwenger_points;
+  }
+
+  const equipos = teams.map((t) => ({ id: t.id, name: t.name, crestUrl: t.crest_url }));
+  const clasificacion = calcularClasificacion(equipos, fixtures, results, ultimaJornadaCerrada);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.3em] text-neon-purple">
+            Clasificación
           </p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+            {ultimaJornadaCerrada > 0
+              ? `Después de la jornada ${ultimaJornadaCerrada}`
+              : "Todavía no hay jornadas cerradas"}
+          </h1>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        <CelebrateButton />
+      </div>
+
+      <div className="overflow-x-auto rounded-2xl border border-border">
+        <table className="w-full min-w-[640px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
+              <th className="px-3 py-3 font-medium">#</th>
+              <th className="px-3 py-3 font-medium">Equipo</th>
+              <th className="px-3 py-3 text-right font-medium">PJ</th>
+              <th className="px-3 py-3 text-right font-medium">Pts</th>
+              <th className="px-3 py-3 text-right font-medium">PF</th>
+              <th className="px-3 py-3 text-right font-medium">PC</th>
+              <th className="px-3 py-3 text-right font-medium">DP</th>
+              <th className="px-3 py-3 text-right font-medium">MP</th>
+              <th className="px-3 py-3 text-right font-medium">🏅 JG</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clasificacion.map((fila, i) => (
+              <tr
+                key={fila.team.id}
+                className={`border-b border-border/60 last:border-0 ${
+                  i === 0 ? "bg-neon-purple/10" : "hover:bg-white/[0.03]"
+                }`}
+              >
+                <td className="px-3 py-3 font-semibold">{MEDALLAS[i] ?? i + 1}</td>
+                <td className="px-3 py-3">
+                  <span className="inline-flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={fila.team.crestUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
+                    <span className={i === 0 ? "font-semibold text-foreground" : "text-foreground"}>
+                      {fila.team.name}
+                    </span>
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-right text-muted">{fila.pj}</td>
+                <td className="px-3 py-3 text-right font-bold text-neon-green">{fila.pts}</td>
+                <td className="px-3 py-3 text-right text-muted">{fila.pf}</td>
+                <td className="px-3 py-3 text-right text-muted">{fila.pc}</td>
+                <td className="px-3 py-3 text-right text-muted">
+                  {fila.dp > 0 ? `+${fila.dp}` : fila.dp}
+                </td>
+                <td className="px-3 py-3 text-right text-muted">{fila.mp.toFixed(1)}</td>
+                <td className="px-3 py-3 text-right text-muted">{fila.jg}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-4 text-xs text-muted">
+        Pts: 3 victoria clara · 2 victoria ajustada · 1.5 empate técnico (±1) ·
+        1 derrota ajustada · 0 derrota clara. JG: jornadas en las que has sido
+        el que más puntos Biwenger ha sacado esa semana.
+      </p>
+    </main>
   );
 }
