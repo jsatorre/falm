@@ -1,5 +1,6 @@
 import { COOKIE_NAME, equipoDeSesion } from "../../lib/auth";
 import { supabase } from "../../lib/supabaseServer";
+import { getCaraACaraRounds } from "../../lib/caraACaraRounds";
 
 function equipoAutenticado(request) {
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
@@ -7,19 +8,11 @@ function equipoAutenticado(request) {
 }
 
 // La "ventana de fichajes" abierta es siempre la próxima jornada cara a
-// cara (1-22) que todavía está pendiente — no hace falta que nadie la abra
-// ni cierre a mano.
+// cara que todavía está pendiente — no hace falta que nadie la abra ni
+// cierre a mano.
 async function rondaDeFichajesActual() {
-  const { data, error } = await supabase
-    .from("rounds")
-    .select("id, jornada")
-    .lte("jornada", 22)
-    .eq("status", "pending")
-    .order("jornada", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+  const rounds = await getCaraACaraRounds();
+  return rounds.find((r) => r.status === "pending") ?? null;
 }
 
 export async function GET(request) {

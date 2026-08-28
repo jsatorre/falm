@@ -6,7 +6,9 @@ import LogoutButton from "./LogoutButton";
 const TABS = [
   { href: "/", label: "Clasificación", icon: "🏆" },
   { href: "/en-directo", label: "Jornada en directo", icon: "🔴" },
+  { href: "/calendario", label: "Calendario", icon: "📅" },
   { href: "/fichajes", label: "Fichajes", icon: "🤝" },
+  { href: "/palmares", label: "Palmarés", icon: "🏅" },
 ];
 
 export default async function NavBar() {

@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseServer";
+import { getCaraACaraRounds } from "./caraACaraRounds";
 
 /**
  * Snapshot de la jornada cara a cara "en directo" (la próxima no cerrada,
@@ -7,12 +8,7 @@ import { supabase } from "./supabaseServer";
  * lo hace quien llame a esto primero (ver app/lib/sync.js).
  */
 export async function getRondaEnDirecto() {
-  const { data: rounds } = await supabase
-    .from("rounds")
-    .select("id, jornada, status")
-    .lte("jornada", 22)
-    .order("jornada", { ascending: true });
-
+  const rounds = await getCaraACaraRounds();
   const ronda = rounds.find((r) => r.status !== "finished") ?? rounds.at(-1) ?? null;
   if (!ronda) return { jornada: null, fixtures: [] };
 
@@ -32,5 +28,5 @@ export async function getRondaEnDirecto() {
     pointsB: puntosPorEquipo[f.team_b_id] ?? null,
   }));
 
-  return { jornada: ronda.jornada, status: ronda.status, fixtures };
+  return { jornada: ronda.jornadaCaraACara, status: ronda.status, fixtures };
 }

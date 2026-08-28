@@ -1,28 +1,29 @@
 import { calcularClasificacion } from "./lib/scoring";
 import { supabase } from "./lib/supabaseServer";
+import { getCaraACaraRounds } from "./lib/caraACaraRounds";
 import CelebrateButton from "./components/CelebrateButton";
 
 const MEDALLAS = ["🥇", "🥈", "🥉"];
 
 export default async function ClasificacionPage() {
-  const [{ data: teams }, { data: rounds }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
+  const [rounds, { data: teams }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
+    getCaraACaraRounds(),
     supabase.from("teams").select("id, name, crest_url"),
-    supabase.from("rounds").select("id, jornada, status").lte("jornada", 22),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
     supabase.from("round_results").select("round_id, team_id, biwenger_points"),
   ]);
 
-  const jornadaPorRoundId = new Map(rounds.map((r) => [r.id, r.jornada]));
+  const jornadaCaraACaraPorRoundId = new Map(rounds.map((r) => [r.id, r.jornadaCaraACara]));
   const ultimaJornadaCerrada = Math.max(
     0,
-    ...rounds.filter((r) => r.status === "finished").map((r) => r.jornada)
+    ...rounds.filter((r) => r.status === "finished").map((r) => r.jornadaCaraACara)
   );
 
   const fixtures = fixturesRaw
-    .filter((f) => jornadaPorRoundId.has(f.round_id))
+    .filter((f) => jornadaCaraACaraPorRoundId.has(f.round_id))
     .map((f) => ({
       roundId: f.round_id,
-      jornada: jornadaPorRoundId.get(f.round_id),
+      jornada: jornadaCaraACaraPorRoundId.get(f.round_id),
       teamAId: f.team_a_id,
       teamBId: f.team_b_id,
     }));
