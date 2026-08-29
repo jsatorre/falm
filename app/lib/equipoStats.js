@@ -59,9 +59,11 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId) {
   let partidosJugados = 0;
   let goles = 0;
   let mvps = 0;
-  let puntosTotales = 0; // temporada completa, tengas al jugador o no (el "Pts" que muestra Biwenger)
-  let puntosDesdeFichaje = 0; // solo partidos jugados desde que lo fichaste
-  let puntosAprovechados = 0; // de esos, los que contaron porque lo pusiste de titular en tu once
+  // "Puntos totales" es SOLO desde que lo fichaste (aprovechados +
+  // desperdiciados) — no el total de toda la temporada de Biwenger, que
+  // incluiría partidos jugados antes de ser tuyo.
+  let puntosAprovechados = 0;
+  let puntosDesperdiciados = 0;
 
   for (const r of reports) {
     const stats = r.rawStats ?? {};
@@ -71,15 +73,14 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId) {
     goles += stats.goals ?? 0;
     if (stats.mvp) mvps += 1;
 
-    const puntosRonda = puntosSegunLiga(r, scoreId);
-    puntosTotales += puntosRonda;
-
     const fechaPartido = r.match?.date ?? 0;
     if (fechaPartido >= fechaFichaje) {
-      puntosDesdeFichaje += puntosRonda;
+      const puntosRonda = puntosSegunLiga(r, scoreId);
       const titulares = titularesPorRonda.get(r.match?.round?.id) ?? [];
       if (titulares.includes(ficha.id)) {
         puntosAprovechados += puntosRonda;
+      } else {
+        puntosDesperdiciados += puntosRonda;
       }
     }
   }
@@ -95,7 +96,6 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId) {
     posicion: posicion.nombre,
     club: ficha.team?.name ?? "?",
     disponible: ficha.status === "ok",
-    valor: ficha.price ?? null,
     precioFichaje: ownership?.owner?.price ?? null,
     foto: fotoJugadorUrl(ficha.id),
     partidosClub: reports.length,
@@ -105,9 +105,9 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId) {
     goles,
     mvps,
     vecesTitularFalm,
-    puntosTotales,
+    puntosTotales: puntosAprovechados + puntosDesperdiciados,
     puntosAprovechados,
-    puntosDesperdiciados: puntosDesdeFichaje - puntosAprovechados,
+    puntosDesperdiciados,
   };
 }
 
