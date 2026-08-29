@@ -2,6 +2,7 @@ import { COOKIE_NAME, equipoDeSesion } from "../../lib/auth";
 import { supabase } from "../../lib/supabaseServer";
 import { getCaraACaraRounds } from "../../lib/caraACaraRounds";
 import { publicarFichajesSiToca, deadlinePasada, asegurarDeadlineFichajes } from "../../lib/fichajesEngine";
+import { getJugadoresLibres } from "../../lib/fichajePool";
 
 function equipoAutenticado(request) {
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
@@ -55,12 +56,28 @@ export async function GET(request) {
     .eq("team_id", teamId)
     .maybeSingle();
 
+  // Sin esto la wishlist es texto libre y cualquier error tipográfico (o
+  // pedir a alguien que ya tiene equipo) no se detecta hasta que se
+  // publican los fichajes — mejor ofrecer solo los que de verdad están
+  // libres en Biwenger. Un fallo puntual no debe bloquear el formulario:
+  // se avisa con libresError y el cliente cae a un campo de texto normal.
+  let jugadoresLibres = [];
+  let libresError = false;
+  try {
+    jugadoresLibres = await getJugadoresLibres();
+  } catch (err) {
+    console.error("No se ha podido cargar la lista de jugadores libres para fichajes:", err);
+    libresError = true;
+  }
+
   return Response.json({
     player1: data?.player_1 ?? "",
     player2: data?.player_2 ?? "",
     cerrado: false,
     publicado: false,
     deadline: ronda.fichajes_deadline,
+    jugadoresLibres,
+    libresError,
   });
 }
 

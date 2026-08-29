@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function FichajesForm() {
   const [datos, setDatos] = useState(null);
@@ -88,18 +88,38 @@ export default function FichajesForm() {
     <form onSubmit={guardar} className="flex flex-col gap-4">
       {datos.deadline && <ContadorDeadline deadline={datos.deadline} />}
 
-      <Campo
-        label="1ª opción"
-        placeholder="ej. Vinicius Jr."
-        value={player1}
-        onChange={setPlayer1}
-      />
-      <Campo
-        label="2ª opción (por si te la quitan)"
-        placeholder="ej. Lamine Yamal"
-        value={player2}
-        onChange={setPlayer2}
-      />
+      {datos.libresError ? (
+        <>
+          <Campo label="1ª opción" placeholder="ej. Vinicius Jr." value={player1} onChange={setPlayer1} />
+          <Campo
+            label="2ª opción (por si te la quitan)"
+            placeholder="ej. Lamine Yamal"
+            value={player2}
+            onChange={setPlayer2}
+          />
+          <p className="text-xs text-neon-pink">
+            No se ha podido cargar la lista de jugadores libres ahora mismo — de momento escribe el
+            nombre a mano.
+          </p>
+        </>
+      ) : (
+        <>
+          <ComboboxJugador
+            label="1ª opción"
+            value={player1}
+            onChange={setPlayer1}
+            jugadores={datos.jugadoresLibres ?? []}
+            excluirNombre={player2}
+          />
+          <ComboboxJugador
+            label="2ª opción (por si te la quitan)"
+            value={player2}
+            onChange={setPlayer2}
+            jugadores={datos.jugadoresLibres ?? []}
+            excluirNombre={player1}
+          />
+        </>
+      )}
 
       <button
         type="submit"
@@ -115,6 +135,74 @@ export default function FichajesForm() {
         llevarse su 1ª opción libre.
       </p>
     </form>
+  );
+}
+
+function ComboboxJugador({ label, value, onChange, jugadores, excluirNombre }) {
+  const [busqueda, setBusqueda] = useState("");
+
+  const jugadorSeleccionado = jugadores.find((j) => j.nombre === value);
+
+  const resultados = useMemo(() => {
+    if (!busqueda.trim()) return [];
+    const q = busqueda.toLowerCase();
+    return jugadores
+      .filter((j) => j.nombre !== excluirNombre && j.nombre.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [busqueda, jugadores, excluirNombre]);
+
+  return (
+    <div className="flex flex-col gap-1.5 text-sm">
+      <span className="text-muted">{label}</span>
+
+      {value ? (
+        <div className="flex items-center justify-between rounded-xl border border-neon-green/40 bg-neon-green/10 px-4 py-2.5">
+          <span className="text-foreground">
+            {value}
+            {jugadorSeleccionado && <span className="ml-1.5 text-xs text-muted">({jugadorSeleccionado.club})</span>}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-xs text-muted hover:text-neon-pink"
+          >
+            ✕ quitar
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="busca un jugador libre..."
+            className="w-full rounded-xl border border-border bg-background px-4 py-2.5 outline-none focus:border-neon-green"
+          />
+          {resultados.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-border bg-background-elevated shadow-lg">
+              {resultados.map((j) => (
+                <button
+                  key={j.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(j.nombre);
+                    setBusqueda("");
+                  }}
+                  className="flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-white/5"
+                >
+                  <span className="text-foreground">
+                    {j.nombre} <span className="text-xs text-muted">{j.posicionCodigo}</span>
+                  </span>
+                  <span className="text-xs text-muted">{j.club}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {busqueda.trim() && resultados.length === 0 && (
+            <p className="mt-1 text-xs text-muted">Ningún jugador libre coincide.</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

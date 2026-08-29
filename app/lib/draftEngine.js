@@ -13,7 +13,7 @@ const POSICION = { 1: "PT", 2: "DF", 3: "MC", 4: "DL" };
 let poolCache = null; // { ts, promise }
 const POOL_CACHE_MS = 10 * 60 * 1000;
 
-async function getPoolCompleto() {
+export async function getPoolCompleto() {
   const ahora = Date.now();
   if (!poolCache || ahora - poolCache.ts > POOL_CACHE_MS) {
     poolCache = { ts: ahora, promise: cargarPoolCompleto() };
@@ -57,7 +57,7 @@ async function cargarPoolCompleto() {
 let propietariosCache = null; // { ts, data }
 const PROPIETARIOS_CACHE_MS = 20 * 1000;
 
-async function getPropietariosBiwenger(teams) {
+export async function getPropietariosBiwenger(teams) {
   const ahora = Date.now();
   if (propietariosCache && ahora - propietariosCache.ts < PROPIETARIOS_CACHE_MS) {
     return propietariosCache.data;
@@ -154,11 +154,6 @@ function contarPorClub(teamId, ocupacion, pool) {
 }
 
 /**
- * Si el equipo puede fichar a ese jugador ahora mismo: que esté libre y
- * que no se pase del tope de jugadores por club real (2 para
- * Atlético/Barça/Madrid, 3 para el resto).
- */
-/**
  * Aplana el estado de getEstadoDraft() a algo directamente serializable
  * (Map -> objetos planos) para mandarlo al cliente — lo usan tanto la
  * página del draft (carga inicial en servidor) como GET /api/draft
@@ -198,6 +193,11 @@ export function shapeEstadoDraft(estado, teamId) {
   };
 }
 
+/**
+ * Si el equipo puede fichar a ese jugador ahora mismo: que esté libre y
+ * que no se pase del tope de jugadores por club real (2 para
+ * Atlético/Barça/Madrid, 3 para el resto).
+ */
 export function puedeFichar(teamId, jugador, ocupacion, pool) {
   if (ocupacion.has(jugador.id)) return { ok: false, motivo: "Ese jugador ya está fichado." };
 
