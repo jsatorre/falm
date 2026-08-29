@@ -110,9 +110,36 @@ export async function getEstadoDraft() {
 
   const enMarcha = Boolean(estado?.started_at) && !estado?.finished_at;
   const teamOrder = estado?.team_order ?? [];
-  const currentPick = estado?.current_pick ?? 0;
   const pickSize = estado?.pick_size ?? 22;
   const totalPicks = teamOrder.length * pickSize;
+  const retiradoTeamIds = new Set(estado?.retired_teams ?? []);
+
+  // Un equipo "retirado" (botón "Ya no quiero más jugadores") se salta
+  // automáticamente en cuanto le toca, sin que nadie tenga que hacer nada
+  // — y se deja guardado el hueco ya saltado para no repetir el cálculo en
+  // cada lectura. Es reversible: si vuelve a activarse, simplemente
+  // recupera turno en su siguiente hueco de la serpiente (los que ya se
+  // saltaron mientras estaba retirado no se recuperan).
+  let currentPick = estado?.current_pick ?? 0;
+  if (enMarcha && teamOrder.length > 0 && retiradoTeamIds.size > 0) {
+    let avanzado = false;
+    while (currentPick < totalPicks) {
+      const ronda = Math.floor(currentPick / teamOrder.length);
+      const posicionEnRonda = currentPick % teamOrder.length;
+      const ordenRonda = ronda % 2 === 0 ? teamOrder : [...teamOrder].reverse();
+      if (!retiradoTeamIds.has(ordenRonda[posicionEnRonda])) break;
+      currentPick += 1;
+      avanzado = true;
+    }
+    if (avanzado) {
+      const { error: skipError } = await supabase
+        .from("draft_state")
+        .update({ current_pick: currentPick })
+        .eq("id", true);
+      if (skipError) console.error("No se ha podido guardar el salto de turnos retirados:", skipError);
+    }
+  }
+
   const terminado = Boolean(estado?.finished_at) || (enMarcha && currentPick >= totalPicks);
 
   let turnoDe = null;
@@ -137,6 +164,7 @@ export async function getEstadoDraft() {
     picks: picks ?? [],
     ocupacion,
     pool: pool.jugadores,
+    retiradoTeamIds,
   };
 }
 
@@ -171,6 +199,8 @@ export function shapeEstadoDraft(estado, teamId) {
     turnoDeTeamId: estado.turnoDeTeamId,
     esMiTurno: estado.turnoDeTeamId === teamId,
     teamOrder: estado.teamOrder,
+    retirados: [...estado.retiradoTeamIds],
+    estoyRetirado: estado.retiradoTeamIds.has(teamId),
     equipos: Object.values(estado.equipoPorId).map((e) => ({ id: e.id, name: e.name, crest_url: e.crest_url })),
     picks: estado.picks.map((p) => ({
       pickIndex: p.pick_index,

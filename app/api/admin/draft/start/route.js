@@ -24,6 +24,7 @@ export async function POST() {
     pick_size: 22,
     started_at: new Date().toISOString(),
     finished_at: null,
+    retired_teams: [],
   });
   if (upsertError) return Response.json({ error: upsertError.message }, { status: 500 });
 

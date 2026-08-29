@@ -106,6 +106,9 @@ create table if not exists draft_state (
     pick_size integer not null default 22,
     started_at timestamptz,
     finished_at timestamptz,
+    -- equipos que han pulsado "Ya no quiero más jugadores" — se saltan sus
+    -- turnos futuros automáticamente, reversible en cualquier momento.
+    retired_teams jsonb not null default '[]'::jsonb,
     check (id)
 );
 

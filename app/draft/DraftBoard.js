@@ -33,14 +33,16 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     return () => clearInterval(id);
   }, [refrescar]);
 
-  async function fichar(playerId) {
-    setFicharEnCurso(playerId);
+  async function fichar(jugador) {
+    if (!confirm(`¿Fichar a ${jugador.nombre} (${jugador.club})?`)) return;
+
+    setFicharEnCurso(jugador.id);
     setError(null);
     try {
       const res = await fetch("/api/draft/fichar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId }),
+        body: JSON.stringify({ playerId: jugador.id }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -50,6 +52,23 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
       await refrescar();
     } finally {
       setFicharEnCurso(null);
+    }
+  }
+
+  const [retirando, setRetirando] = useState(false);
+
+  async function alternarRetiro() {
+    const mensaje = datos.estoyRetirado
+      ? "¿Volver a fichar? Recuperarás turno en tu siguiente hueco."
+      : "¿Seguro que no quieres fichar más jugadores? Se saltarán tus turnos hasta que le vuelvas a dar aquí.";
+    if (!confirm(mensaje)) return;
+
+    setRetirando(true);
+    try {
+      const res = await fetch("/api/draft/retirar", { method: "POST" });
+      if (res.ok) await refrescar();
+    } finally {
+      setRetirando(false);
     }
   }
 
@@ -155,7 +174,26 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
               ¡Es tu turno!
             </span>
           )}
+          <button
+            type="button"
+            onClick={alternarRetiro}
+            disabled={retirando}
+            className={`ml-auto rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
+              datos.estoyRetirado
+                ? "border-neon-green text-neon-green hover:bg-neon-green/10"
+                : "border-border text-muted hover:border-neon-pink hover:text-neon-pink"
+            }`}
+          >
+            {datos.estoyRetirado ? "Volver a fichar" : "Ya no quiero más jugadores"}
+          </button>
         </div>
+      )}
+
+      {datos.estoyRetirado && (
+        <p className="mt-3 rounded-lg border border-neon-orange/40 bg-neon-orange/10 px-3 py-2 text-xs text-neon-orange">
+          Has renunciado a fichar más jugadores — tus turnos se saltan automáticamente. Puedes
+          deshacerlo cuando quieras con el botón de arriba.
+        </p>
       )}
 
       {ultimosPicks.length > 0 && (
@@ -282,7 +320,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
                       {!j.ocupado && !datos.terminado && (
                         <button
                           type="button"
-                          onClick={() => fichar(j.id)}
+                          onClick={() => fichar(j)}
                           disabled={!datos.esMiTurno || ficharEnCurso === j.id}
                           className="rounded-lg bg-neon-pink px-3 py-1.5 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-30"
                           title={datos.esMiTurno ? "Fichar" : "Solo puede fichar quien tenga el turno"}
