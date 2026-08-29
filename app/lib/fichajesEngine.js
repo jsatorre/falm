@@ -93,3 +93,60 @@ export async function publicarFichajesSiToca(ronda) {
 export function deadlinePasada(ronda) {
   return Boolean(ronda.fichajes_deadline) && new Date(ronda.fichajes_deadline) <= new Date();
 }
+
+/**
+ * Próxima ocurrencia de un día de la semana + hora, estrictamente después
+ * de `desde` (nunca devuelve "ahora mismo" ni el pasado). diaSemana usa el
+ * mismo criterio que Date#getDay(): 0 = domingo ... 6 = sábado.
+ */
+export function calcularProximaHoraTope(diaSemana, horaStr, desde = new Date()) {
+  const [horas, minutos] = horaStr.split(":").map(Number);
+  const candidato = new Date(desde);
+  candidato.setHours(horas, minutos, 0, 0);
+
+  const diasHastaObjetivo = (diaSemana - candidato.getDay() + 7) % 7;
+  candidato.setDate(candidato.getDate() + diasHastaObjetivo);
+
+  if (candidato <= desde) {
+    candidato.setDate(candidato.getDate() + 7);
+  }
+
+  return candidato;
+}
+
+async function leerConfigFichajes() {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("key, value")
+    .in("key", ["fichajes_dia_semana", "fichajes_hora"]);
+  if (error) throw error;
+
+  const config = Object.fromEntries((data ?? []).map((s) => [s.key, s.value]));
+  if (config.fichajes_dia_semana == null || !config.fichajes_hora) return null;
+
+  return { diaSemana: Number(config.fichajes_dia_semana), hora: config.fichajes_hora };
+}
+
+/**
+ * Si la jornada de fichajes activa todavía no tiene hora tope asignada, y
+ * hay una regla semanal configurada (ver /admin), le calcula y guarda la
+ * próxima ocurrencia de esa regla — una sola vez por jornada (una vez
+ * fijada, no se recalcula aunque pase el tiempo, para que no "huya" del
+ * usuario). Devuelve la ronda con `fichajes_deadline` ya relleno si
+ * procede.
+ */
+export async function asegurarDeadlineFichajes(ronda) {
+  if (ronda.fichajes_deadline) return ronda;
+
+  const config = await leerConfigFichajes();
+  if (!config) return ronda;
+
+  const deadline = calcularProximaHoraTope(config.diaSemana, config.hora);
+  const { error } = await supabase
+    .from("rounds")
+    .update({ fichajes_deadline: deadline.toISOString() })
+    .eq("id", ronda.id);
+  if (error) throw error;
+
+  return { ...ronda, fichajes_deadline: deadline.toISOString() };
+}

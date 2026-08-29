@@ -29,12 +29,13 @@ export default async function AdminPage() {
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
-          Hora tope de fichajes
+          Hora tope de fichajes (regla semanal)
         </h2>
         <p className="mb-3 text-xs text-muted">
-          Se aplica a la próxima jornada de fichajes (la más cercana que todavía está pendiente).
-          En cuanto pase esa hora, la siguiente vez que alguien entre en Fichajes se calculan y
-          publican las asignaciones automáticamente.
+          Se configura una vez y se aplica todas las semanas sola — ej. todos los jueves a las
+          23:50. En cuanto pasa esa hora, la siguiente vez que alguien entra en Fichajes se
+          calculan y publican las asignaciones de esa jornada automáticamente, y la siguiente
+          jornada ya toma la hora tope de la semana siguiente.
         </p>
         <FichajesDeadlineForm />
       </section>

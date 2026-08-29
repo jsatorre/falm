@@ -7,6 +7,16 @@ import { getAllTeamsRoundPoints, getSeasonRounds } from "./integrations/biwenger
  * congelado en lo que fuera cuando se sembró la base de datos y la
  * pantalla "en directo" no avanza nunca de jornada aunque pasen semanas.
  */
+// Biwenger habla de "pending"/"active"/"finished"; nuestra columna admite
+// "pending"/"live"/"finished" — hay que traducir, no copiar tal cual (un
+// valor que no encaje revienta el CHECK y, como este paso va antes que la
+// sincronización de puntos, se llevaba por delante el sync entero).
+const ESTADO_BIWENGER_A_NUESTRO = {
+  pending: "pending",
+  active: "live",
+  finished: "finished",
+};
+
 async function syncEstadosDeJornada() {
   const [seasonRounds, { data: rounds, error }] = await Promise.all([
     getSeasonRounds(),
@@ -16,18 +26,21 @@ async function syncEstadosDeJornada() {
 
   const estadoPorBiwengerId = new Map(seasonRounds.map((r) => [String(r.id), r.status]));
   const cambios = rounds
-    .filter((r) => {
-      const nuevo = estadoPorBiwengerId.get(String(r.biwenger_round_id));
-      return nuevo && nuevo !== r.status;
+    .map((r) => {
+      const estadoBiwenger = estadoPorBiwengerId.get(String(r.biwenger_round_id));
+      const nuevo = ESTADO_BIWENGER_A_NUESTRO[estadoBiwenger];
+      return nuevo && nuevo !== r.status ? { id: r.id, status: nuevo } : null;
     })
-    .map((r) => ({ id: r.id, status: estadoPorBiwengerId.get(String(r.biwenger_round_id)) }));
+    .filter(Boolean);
 
   for (const cambio of cambios) {
+    // Un fallo puntual en una jornada no debe abortar el resto del sync
+    // (puntos incluidos) — se registra y se sigue con las demás.
     const { error: updateError } = await supabase
       .from("rounds")
       .update({ status: cambio.status })
       .eq("id", cambio.id);
-    if (updateError) throw updateError;
+    if (updateError) console.error(`No se ha podido actualizar el estado de la ronda ${cambio.id}:`, updateError);
   }
 }
 

@@ -1,7 +1,7 @@
 import { COOKIE_NAME, equipoDeSesion } from "../../lib/auth";
 import { supabase } from "../../lib/supabaseServer";
 import { getCaraACaraRounds } from "../../lib/caraACaraRounds";
-import { publicarFichajesSiToca, deadlinePasada } from "../../lib/fichajesEngine";
+import { publicarFichajesSiToca, deadlinePasada, asegurarDeadlineFichajes } from "../../lib/fichajesEngine";
 
 function equipoAutenticado(request) {
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
@@ -13,7 +13,11 @@ function equipoAutenticado(request) {
 // cierre a mano.
 async function rondaDeFichajesActual() {
   const rounds = await getCaraACaraRounds();
-  return rounds.find((r) => r.status === "pending") ?? null;
+  const ronda = rounds.find((r) => r.status === "pending") ?? null;
+  if (!ronda) return null;
+  // Si hay una regla semanal configurada en /admin y esta jornada todavía
+  // no tiene hora tope, se le asigna aquí (una sola vez, la primera visita).
+  return asegurarDeadlineFichajes(ronda);
 }
 
 export async function GET(request) {

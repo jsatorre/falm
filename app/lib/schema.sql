@@ -87,3 +87,10 @@ create table if not exists records (
 
 create index if not exists fixtures_round_idx on fixtures(round_id);
 create index if not exists round_results_team_idx on round_results(team_id);
+
+-- Configuración general clave/valor (de momento solo la regla semanal de
+-- fichajes: fichajes_dia_semana, fichajes_hora — ver app/lib/fichajesEngine.js).
+create table if not exists app_settings (
+    key text primary key,
+    value text
+);
