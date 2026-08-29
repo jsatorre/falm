@@ -19,6 +19,7 @@ export default async function EquipoPage() {
     try {
       jugadores = await calcularEstadisticasEquipoCacheado(equipo.biwenger_user_id);
     } catch (err) {
+      console.error("No se ha podido cargar la plantilla de Equipo desde Biwenger:", err);
       error = "No se ha podido cargar la plantilla desde Biwenger ahora mismo — prueba otra vez en un rato.";
     }
   }
