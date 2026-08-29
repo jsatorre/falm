@@ -46,18 +46,39 @@ async function cargarPoolCompleto() {
 /**
  * Quién tiene ya fichado (de verdad, en Biwenger) a cada jugador —
  * independiente del draft. Sirve tanto para excluir del pool disponible
- * como para el tope de jugadores por club real.
+ * como para el tope de jugadores por club real. Son 12 llamadas en
+ * paralelo a Biwenger (una por equipo); con el draft en marcha el tablero
+ * hace polling cada 5s desde varios móviles a la vez, así que sin caché
+ * esto dispara fácilmente un 429 de Biwenger — se cachea un rato corto
+ * (no hace falta que sea al segundo: nadie ficha de verdad en Biwenger
+ * mientras el draft está en marcha) y, si una carga falla, se sirve la
+ * última copia buena en vez de tumbar la página entera.
  */
-async function getPropietariosBiwenger(teams) {
-  const porEquipo = await Promise.all(
-    teams.map(async (t) => ({ teamId: t.id, plantilla: await getPlantilla(t.biwenger_user_id) }))
-  );
+let propietariosCache = null; // { ts, data }
+const PROPIETARIOS_CACHE_MS = 20 * 1000;
 
-  const propietarios = new Map(); // playerId -> teamId
-  for (const { teamId, plantilla } of porEquipo) {
-    for (const p of plantilla) propietarios.set(p.id, teamId);
+async function getPropietariosBiwenger(teams) {
+  const ahora = Date.now();
+  if (propietariosCache && ahora - propietariosCache.ts < PROPIETARIOS_CACHE_MS) {
+    return propietariosCache.data;
   }
-  return propietarios;
+
+  try {
+    const porEquipo = await Promise.all(
+      teams.map(async (t) => ({ teamId: t.id, plantilla: await getPlantilla(t.biwenger_user_id) }))
+    );
+
+    const propietarios = new Map(); // playerId -> teamId
+    for (const { teamId, plantilla } of porEquipo) {
+      for (const p of plantilla) propietarios.set(p.id, teamId);
+    }
+    propietariosCache = { ts: ahora, data: propietarios };
+    return propietarios;
+  } catch (err) {
+    console.error("No se ha podido refrescar la propiedad real de Biwenger para el draft:", err);
+    if (propietariosCache) return propietariosCache.data; // mejor una copia algo vieja que tumbar la página
+    return new Map();
+  }
 }
 
 /**

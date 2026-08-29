@@ -35,12 +35,19 @@ async function headers() {
   };
 }
 
-async function biwengerFetch(path, reintentado = false) {
+async function biwengerFetch(path, reintentado = false, intentos429 = 0) {
   const res = await fetch(`${BASE}${path}`, { headers: await headers() });
 
   if (res.status === 401 && !reintentado) {
     tokenCache = null; // fuerza relogin
-    return biwengerFetch(path, true);
+    return biwengerFetch(path, true, intentos429);
+  }
+  // 429: Biwenger nos está limitando (típico cuando se lanzan varias
+  // llamadas en paralelo, p.ej. las 12 plantillas del draft) — un par de
+  // reintentos con espera corta suele bastar, en vez de tumbar la página.
+  if (res.status === 429 && intentos429 < 2) {
+    await new Promise((r) => setTimeout(r, 400 * (intentos429 + 1)));
+    return biwengerFetch(path, reintentado, intentos429 + 1);
   }
   if (!res.ok) {
     throw new Error(`Biwenger ${path} -> ${res.status}`);
