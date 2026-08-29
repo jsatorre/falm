@@ -19,6 +19,9 @@ const COLUMNAS = [
   { key: "goles", label: "⚽ Goles", align: "right" },
   { key: "mvps", label: "⭐ MVPs", align: "right" },
   { key: "vecesTitularFalm", label: "Titular FALM", align: "right" },
+  { key: "puntosTotales", label: "Pts. totales", align: "right" },
+  { key: "puntosAprovechados", label: "Pts. aprovechados", align: "right" },
+  { key: "puntosDesperdiciados", label: "Pts. desperdiciados", align: "right" },
 ];
 
 function formatoValor(numero) {
@@ -173,6 +176,9 @@ export default function EquipoTable({ jugadores }) {
                       <td className="px-3 py-3 text-right font-semibold text-foreground">{j.goles}</td>
                       <td className="px-3 py-3 text-right font-semibold text-foreground">{j.mvps}</td>
                       <td className="px-3 py-3 text-right font-semibold text-neon-green">{j.vecesTitularFalm}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-foreground">{j.puntosTotales}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-neon-green">{j.puntosAprovechados}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-neon-pink">{j.puntosDesperdiciados}</td>
                     </tr>
                   ))}
                 </tbody>

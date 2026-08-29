@@ -61,6 +61,18 @@ export async function getLeagueStandings() {
 }
 
 /**
+ * El sistema de puntuación real que usa la liga (1 = Diario AS, 2 =
+ * SofaScore, 3 = Estadísticas...) — cada jugador trae sus puntos
+ * desglosados por sistema, hay que saber cuál es el nuestro para no coger
+ * el de otro por error.
+ */
+export async function getLeagueScoreId() {
+  const leagueId = process.env.BIWENGER_LEAGUE_ID;
+  const data = await biwengerFetch(`/league/${leagueId}?fields=id,scoreID`);
+  return data.scoreID;
+}
+
+/**
  * Histórico jornada a jornada de UN equipo (puntos Biwenger, nº de
  * jugadores puntuables y posición esa semana).
  */
