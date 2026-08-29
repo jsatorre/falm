@@ -1,11 +1,7 @@
 import { headers } from "next/headers";
 import { supabase } from "../lib/supabaseServer";
 import { calcularEstadisticasEquipoCacheado } from "../lib/equipoStats";
-
-function formatoValor(numero) {
-  if (numero == null) return "—";
-  return new Intl.NumberFormat("es-ES").format(numero) + " €";
-}
+import EquipoTable from "./EquipoTable";
 
 export default async function EquipoPage() {
   const headerList = await headers();
@@ -45,56 +41,8 @@ export default async function EquipoPage() {
       )}
 
       {!error && jugadores.length > 0 && (
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
-                <th className="px-3 py-3 font-medium">Jugador</th>
-                <th className="px-3 py-3 font-medium">Club</th>
-                <th className="px-3 py-3 text-right font-medium">Valor</th>
-                <th className="px-3 py-3 text-right font-medium">PJ club</th>
-                <th className="px-3 py-3 text-right font-medium">Min. totales</th>
-                <th className="px-3 py-3 text-right font-medium">Min. media</th>
-                <th className="px-3 py-3 text-right font-medium">⚽ Goles</th>
-                <th className="px-3 py-3 text-right font-medium">⭐ MVPs</th>
-                <th className="px-3 py-3 text-right font-medium">Titular FALM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jugadores.map((j) => (
-                <tr key={j.id} className="border-b border-border/60 last:border-0 hover:bg-white/[0.03]">
-                  <td className="px-3 py-3">
-                    <span className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={j.foto}
-                        alt=""
-                        className="h-9 w-9 rounded-full border border-border bg-background-elevated object-cover"
-                      />
-                      <span className="flex flex-col">
-                        <span className="flex items-center gap-1.5 font-medium text-foreground">
-                          {j.nombre}
-                          <span
-                            title={j.disponible ? "Disponible" : "Duda / lesión / sanción"}
-                            className={`h-2 w-2 rounded-full ${j.disponible ? "bg-neon-green" : "bg-neon-red"}`}
-                          />
-                        </span>
-                        <span className="text-xs text-muted">{j.posicion}</span>
-                      </span>
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-muted">{j.club}</td>
-                  <td className="px-3 py-3 text-right text-muted">{formatoValor(j.valor)}</td>
-                  <td className="px-3 py-3 text-right text-muted">{j.partidosJugados}</td>
-                  <td className="px-3 py-3 text-right text-muted">{j.minutosTotal}</td>
-                  <td className="px-3 py-3 text-right text-muted">{j.minutosMedia.toFixed(0)}</td>
-                  <td className="px-3 py-3 text-right font-semibold text-foreground">{j.goles}</td>
-                  <td className="px-3 py-3 text-right font-semibold text-foreground">{j.mvps}</td>
-                  <td className="px-3 py-3 text-right font-semibold text-neon-green">{j.vecesTitularFalm}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-6">
+          <EquipoTable jugadores={jugadores} />
         </div>
       )}
 
@@ -102,7 +50,7 @@ export default async function EquipoPage() {
         PJ club / minutos / goles: lo que ha hecho de verdad con su equipo de Liga. "Titular FALM":
         jornadas en las que lo pusiste en tu once — todavía no está confirmado si Biwenger refleja
         aquí el once que pones tú o el once ya con los suplentes automáticos aplicados, lo iremos
-        viendo con datos reales.
+        viendo con datos reales. Haz clic en cualquier cabecera de columna para ordenar.
       </p>
     </main>
   );

@@ -1,6 +1,11 @@
 import { getPlantilla, getAlineacionesPorJornada, getFichaJugador, fotoJugadorUrl } from "./integrations/biwenger";
 
-const POSICION = { 1: "Portero", 2: "Defensa", 3: "Centrocampista", 4: "Delantero" };
+const POSICION = {
+  1: { codigo: "PT", nombre: "Portero" },
+  2: { codigo: "DF", nombre: "Defensa" },
+  3: { codigo: "MC", nombre: "Centrocampista" },
+  4: { codigo: "DL", nombre: "Delantero" },
+};
 
 /**
  * Estadísticas de cada jugador de la plantilla de un equipo: una llamada
@@ -40,11 +45,14 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones) {
   }
 
   const vecesTitularFalm = alineaciones.filter((a) => (a.players ?? []).includes(ficha.id)).length;
+  const posicion = POSICION[ficha.position] ?? { codigo: "?", nombre: "?" };
 
   return {
     id: ficha.id,
     nombre: ficha.name,
-    posicion: POSICION[ficha.position] ?? "?",
+    posicionOrden: ficha.position ?? 99,
+    posicionCodigo: posicion.codigo,
+    posicion: posicion.nombre,
     club: ficha.team?.name ?? "?",
     disponible: ficha.status === "ok",
     valor: ficha.price ?? null,
