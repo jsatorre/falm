@@ -19,6 +19,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [busqueda, setBusqueda] = useState("");
   const [soloLibres, setSoloLibres] = useState(true);
   const [soloWishlist, setSoloWishlist] = useState(false);
+  const [soloMiEquipo, setSoloMiEquipo] = useState(false);
   const [ficharEnCurso, setFicharEnCurso] = useState(null); // playerId en vuelo
   const [error, setError] = useState(null);
 
@@ -73,16 +74,27 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
 
   const clubes = useMemo(() => [...new Set(datos.pool.map((j) => j.club))].sort(), [datos.pool]);
 
+  const misJugadores = useMemo(() => datos.pool.filter((j) => j.teamId === miTeamId), [datos.pool, miTeamId]);
+
   const filtrados = useMemo(() => {
     return datos.pool.filter((j) => {
       if (posicion !== "TODOS" && j.posicionCodigo !== posicion) return false;
       if (club !== "TODOS" && j.club !== club) return false;
       if (busqueda && !j.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false;
+      if (soloMiEquipo) return j.teamId === miTeamId;
       if (soloLibres && j.ocupado) return false;
       if (soloWishlist && !wishlist.has(j.id)) return false;
       return true;
     });
-  }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, wishlist]);
+  }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
+
+  function alternarMiEquipo() {
+    setSoloMiEquipo((v) => {
+      const activar = !v;
+      if (activar) setSoloLibres(false); // tus jugadores siempre están "ocupados" por ti, si no se anula el otro filtro no se ve nada
+      return activar;
+    });
+  }
 
   const grupos =
     posicion === "TODOS"
@@ -117,6 +129,9 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-background-elevated px-4 py-3">
           <span className="rounded-full bg-neon-pink/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-neon-pink">
             Pick {datos.currentPick + 1} / {datos.totalPicks} · Ronda {datos.ronda}
+          </span>
+          <span className="rounded-full border border-border px-2.5 py-1 text-[10px] text-muted">
+            Tu plantilla: {misJugadores.length} / {datos.pickSize}
           </span>
           {equipoTurno && (
             <span className="flex items-center gap-2 text-sm">
@@ -196,6 +211,9 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
           <ChipFiltro activo={soloWishlist} onClick={() => setSoloWishlist((v) => !v)}>
             ★ Mi wishlist
           </ChipFiltro>
+          <ChipFiltro activo={soloMiEquipo} onClick={alternarMiEquipo}>
+            👕 Mi equipo ({misJugadores.length})
+          </ChipFiltro>
         </div>
       </div>
 
@@ -213,7 +231,6 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
                   <th className="px-3 py-3 font-medium">★</th>
                   <th className="px-3 py-3 font-medium">Jugador</th>
                   <th className="px-3 py-3 font-medium">Club</th>
-                  <th className="px-3 py-3 text-right font-medium">Pts</th>
                   <th className="px-3 py-3 font-medium">Estado</th>
                   <th className="px-3 py-3 font-medium"></th>
                 </tr>
@@ -236,7 +253,6 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
                       <span className="ml-1.5 text-xs text-muted">{j.posicionCodigo}</span>
                     </td>
                     <td className="px-3 py-2.5 text-muted">{j.club}</td>
-                    <td className="px-3 py-2.5 text-right text-muted">{j.puntos}</td>
                     <td className="px-3 py-2.5">
                       {j.ocupado ? (
                         <span className="text-xs text-muted">
