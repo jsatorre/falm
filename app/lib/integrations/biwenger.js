@@ -96,6 +96,44 @@ export function iconUrl(icon) {
   return `https://cdn.biwenger.com/${icon}`;
 }
 
+export function fotoJugadorUrl(playerId) {
+  return `https://cdn.biwenger.com/i/p/${playerId}.png`;
+}
+
+/**
+ * Plantilla de un equipo: IDs de los jugadores que tiene fichados (y lo
+ * que pagó por cada uno).
+ */
+export async function getPlantilla(biwengerTeamId) {
+  const data = await biwengerFetch(`/user/${biwengerTeamId}?fields=id,name,players(id,owner)`);
+  return data.players ?? []; // [{ id, owner: { date, price } }]
+}
+
+/**
+ * Alineación puesta cada jornada (once titular), para saber en qué
+ * jornadas ha jugado de titular cada jugador en ESTE equipo — no es lo
+ * mismo que si jugó con su club de verdad.
+ */
+export async function getAlineacionesPorJornada(biwengerTeamId) {
+  const data = await biwengerFetch(`/user/${biwengerTeamId}?fields=id,name,lineups(round,players)`);
+  return data.lineups ?? []; // [{ round: {id,name,short}, players: [playerId|null, ...] }]
+}
+
+/**
+ * Ficha completa de un jugador: datos básicos (posición, precio, estado,
+ * club) + el historial completo de partidos reales con su club
+ * (reports[].rawStats: goles, minutos jugados, MVP, etc.). Endpoint
+ * público, sin login.
+ */
+export async function getFichaJugador(playerId) {
+  const res = await fetch(
+    `https://cf.biwenger.com/api/v2/players/la-liga/${playerId}?fields=*,team,fitness,reports,competition&score=3&lang=es`
+  );
+  if (!res.ok) throw new Error(`Biwenger player ${playerId} -> ${res.status}`);
+  const { data } = await res.json();
+  return data;
+}
+
 /**
  * Jornadas de la temporada actual de La Liga, en orden, sin las
  * "aplazadas" (partidos que se reprograman fuera de su jornada original —

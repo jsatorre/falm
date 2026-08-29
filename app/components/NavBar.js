@@ -9,6 +9,7 @@ const TABS = [
   { href: "/calendario", label: "Calendario", icon: "📅" },
   { href: "/fichajes", label: "Fichajes", icon: "🤝" },
   { href: "/palmares", label: "Palmarés", icon: "🏅" },
+  { href: "/equipo", label: "Equipo", icon: "👕" },
 ];
 
 export default async function NavBar() {
