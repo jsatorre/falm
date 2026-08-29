@@ -1,4 +1,4 @@
-import { syncBiwengerResultsCached } from "../../lib/sync";
+import { syncBiwengerResultsCached, ultimaSincronizacion } from "../../lib/sync";
 import { getRondaEnDirecto } from "../../lib/liveRound";
 
 export async function GET() {
@@ -10,5 +10,6 @@ export async function GET() {
     console.error("No se ha podido sincronizar con Biwenger:", err);
   }
 
-  return Response.json(await getRondaEnDirecto());
+  const datos = await getRondaEnDirecto();
+  return Response.json({ ...datos, syncedAt: ultimaSincronizacion() });
 }

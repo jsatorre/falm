@@ -95,10 +95,13 @@ export async function syncBiwengerResults() {
   return { synced: filas.length };
 }
 
-// Cache corta en memoria del proceso, compartida por /api/live y por la
-// carga inicial de la página "en directo" — si varios amigos entran a la
-// vez no se multiplican las llamadas a Biwenger.
-const CACHE_MS = 15000;
+// Cache en memoria del proceso, compartida por /api/live y por la carga
+// inicial de la página "en directo". Cada sync son 12 llamadas a Biwenger
+// (una por equipo) en paralelo, así que este minuto de margen es también
+// el "cooldown" compartido del botón de actualizar en el cliente: da igual
+// quién lo pulse o cuántos amigos tengan la pantalla abierta a la vez, en
+// esta ventana de 60s solo se dispara una sincronización real.
+const CACHE_MS = 60000;
 let cache = null; // { ts, promise }
 
 export function syncBiwengerResultsCached() {
@@ -107,4 +110,10 @@ export function syncBiwengerResultsCached() {
     cache = { ts: ahora, promise: syncBiwengerResults() };
   }
   return cache.promise;
+}
+
+// Para que el cliente sepa cuánto falta hasta que un refresco manual vaya
+// a disparar una llamada real (en vez de servir el mismo caché de otro).
+export function ultimaSincronizacion() {
+  return cache?.ts ?? null;
 }

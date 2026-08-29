@@ -142,10 +142,10 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, j
 
 // Cache en memoria del proceso por equipo. Esto no es como el marcador en
 // vivo — la plantilla y sus partidos no cambian aunque no haya nadie
-// jugando ahora mismo, así que no hace falta refrescarlo casi nunca; 30
-// min es de sobra y evita llamadas a Biwenger innecesarias fuera de días
-// de partido.
-const CACHE_MS = 30 * 60 * 1000;
+// jugando ahora mismo, así que no hace falta refrescarlo casi nunca; 1h es
+// de sobra y evita llamadas a Biwenger innecesarias fuera de días de
+// partido.
+const CACHE_MS = 60 * 60 * 1000;
 const cachePorEquipo = new Map(); // biwengerTeamId -> { ts, promise }
 
 export function calcularEstadisticasEquipoCacheado(biwengerTeamId) {

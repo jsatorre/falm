@@ -3,32 +3,44 @@
 import { useEffect, useState } from "react";
 import { calcularPuntosEnfrentamiento } from "../lib/scoring";
 
-const POLL_MS = 20000;
+// Cada sync son 12 llamadas a Biwenger en paralelo (una por equipo) — nada
+// de dejarlo con un poll corto y automático. El servidor comparte un mismo
+// caché de 60s entre todos (ver app/lib/sync.js), así que ese es también
+// el cooldown real del botón: da igual quién lo pulse, en esa ventana solo
+// se dispara una sincronización real. El auto cada 15 min es solo para que
+// la pantalla no se quede congelada del todo si alguien la deja abierta
+// sin tocar nada.
+const COOLDOWN_MS = 60000;
+const AUTO_MS = 15 * 60000;
 
 export default function LiveRound({ inicial }) {
   const [datos, setDatos] = useState(inicial);
   const [actualizando, setActualizando] = useState(false);
+  const [ahora, setAhora] = useState(Date.now());
+
+  async function actualizar() {
+    setActualizando(true);
+    try {
+      const res = await fetch("/api/live", { cache: "no-store" });
+      const data = await res.json();
+      setDatos(data);
+    } finally {
+      setActualizando(false);
+    }
+  }
 
   useEffect(() => {
-    let cancelado = false;
-
-    async function tick() {
-      setActualizando(true);
-      try {
-        const res = await fetch("/api/live", { cache: "no-store" });
-        const data = await res.json();
-        if (!cancelado) setDatos(data);
-      } finally {
-        if (!cancelado) setActualizando(false);
-      }
-    }
-
-    const id = setInterval(tick, POLL_MS);
+    const idAuto = setInterval(actualizar, AUTO_MS);
+    const idReloj = setInterval(() => setAhora(Date.now()), 1000);
     return () => {
-      cancelado = true;
-      clearInterval(id);
+      clearInterval(idAuto);
+      clearInterval(idReloj);
     };
   }, []);
+
+  const segundosDesdeSync = datos.syncedAt ? Math.floor((ahora - datos.syncedAt) / 1000) : null;
+  const enCooldown = segundosDesdeSync != null && segundosDesdeSync * 1000 < COOLDOWN_MS;
+  const segundosParaPoder = enCooldown ? Math.ceil((COOLDOWN_MS - segundosDesdeSync * 1000) / 1000) : 0;
 
   if (!datos.jornada) {
     return (
@@ -50,9 +62,19 @@ export default function LiveRound({ inicial }) {
             Jornada {datos.jornada}
           </h1>
         </div>
-        <span className="text-[11px] text-muted">
-          {actualizando ? "actualizando…" : `se actualiza cada ${POLL_MS / 1000}s`}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={actualizar}
+            disabled={actualizando || enCooldown}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-neon-pink hover:text-neon-pink disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {actualizando ? "Actualizando…" : enCooldown ? `Actualizar (${segundosParaPoder}s)` : "Actualizar"}
+          </button>
+          {segundosDesdeSync != null && !actualizando && (
+            <span className="text-[10px] text-muted">actualizado hace {segundosDesdeSync}s</span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">

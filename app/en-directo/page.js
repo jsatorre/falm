@@ -1,4 +1,4 @@
-import { syncBiwengerResultsCached } from "../lib/sync";
+import { syncBiwengerResultsCached, ultimaSincronizacion } from "../lib/sync";
 import { getRondaEnDirecto } from "../lib/liveRound";
 import LiveRound from "../components/LiveRound";
 
@@ -11,6 +11,6 @@ export default async function EnDirectoPage() {
     console.error("No se ha podido sincronizar con Biwenger:", err);
   }
 
-  const inicial = await getRondaEnDirecto();
-  return <LiveRound inicial={inicial} />;
+  const datos = await getRondaEnDirecto();
+  return <LiveRound inicial={{ ...datos, syncedAt: ultimaSincronizacion() }} />;
 }
