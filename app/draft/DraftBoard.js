@@ -91,7 +91,16 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   function alternarMiEquipo() {
     setSoloMiEquipo((v) => {
       const activar = !v;
-      if (activar) setSoloLibres(false); // tus jugadores siempre están "ocupados" por ti, si no se anula el otro filtro no se ve nada
+      if (activar) {
+        // Al entrar en "Mi equipo" se parte de cero: el resto de filtros se
+        // quitan y los marca el usuario si le hace falta, en vez de heredar
+        // lo que tuviera puesto antes (p.ej. un club concreto) y liarla.
+        setPosicion("TODOS");
+        setClub("TODOS");
+        setBusqueda("");
+        setSoloLibres(false);
+        setSoloWishlist(false);
+      }
       return activar;
     });
   }
@@ -225,7 +234,14 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
                 {grupo.nombre}
               </p>
             )}
-            <table className="w-full min-w-[720px] border-collapse text-sm">
+            <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
+              <colgroup>
+                <col className="w-[6%]" />
+                <col className="w-[34%]" />
+                <col className="w-[20%]" />
+                <col className="w-[24%]" />
+                <col className="w-[16%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
                   <th className="px-3 py-3 font-medium">★</th>
@@ -248,12 +264,12 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
                         {wishlist.has(j.id) ? "★" : "☆"}
                       </button>
                     </td>
-                    <td className="px-3 py-2.5 font-medium text-foreground">
+                    <td className="truncate px-3 py-2.5 font-medium text-foreground">
                       {j.nombre}
                       <span className="ml-1.5 text-xs text-muted">{j.posicionCodigo}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-muted">{j.club}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="truncate px-3 py-2.5 text-muted">{j.club}</td>
+                    <td className="truncate px-3 py-2.5">
                       {j.ocupado ? (
                         <span className="text-xs text-muted">
                           {j.teamName} {j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}
