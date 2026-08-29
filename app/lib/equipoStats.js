@@ -90,6 +90,7 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, j
   // incluiría partidos jugados antes de ser tuyo.
   let puntosAprovechados = 0;
   let puntosDesperdiciados = 0;
+  let jornadasEnEquipo = 0; // jornadas de FALM transcurridas desde que lo fichaste, haya jugado o no
 
   for (const r of reports) {
     const stats = r.rawStats ?? {};
@@ -101,6 +102,7 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, j
 
     const fechaPartido = r.match?.date ?? 0;
     if (fechaPartido >= fechaFichaje) {
+      jornadasEnEquipo += 1;
       const puntosRonda = puntosSegunLiga(r, scoreId);
       const titulares = titularesPorRonda.get(r.match?.round?.id) ?? [];
       if (titulares.includes(ficha.id)) {
@@ -130,6 +132,7 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, j
     minutosMedia: partidosJugados > 0 ? minutosTotal / partidosJugados : 0,
     goles,
     mvps,
+    jornadasEnEquipo,
     vecesTitularFalm,
     puntosTotales: puntosAprovechados + puntosDesperdiciados,
     puntosAprovechados,

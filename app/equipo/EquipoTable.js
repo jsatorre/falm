@@ -18,6 +18,7 @@ function columnas(nombreEquipo) {
     { key: "minutosMedia", label: "Min. media", align: "right" },
     { key: "goles", label: "⚽", align: "right" },
     { key: "mvps", label: "⭐", align: "right" },
+    { key: "jornadasEnEquipo", label: "Jornadas en el equipo", align: "right" },
     { key: "vecesTitularFalm", label: `Titular ${nombreEquipo}`, align: "right" },
     { key: "puntosTotales", label: "Pts", align: "right" },
     { key: "puntosAprovechados", label: "✅ Pts", align: "right" },
@@ -125,7 +126,7 @@ export default function EquipoTable({ jugadores, nombreEquipo }) {
                   {grupo.nombre}
                 </p>
               )}
-              <table className="w-full min-w-[820px] border-collapse text-sm">
+              <table className="w-full min-w-[920px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
                     {COLUMNAS.map((col) => (
@@ -171,6 +172,7 @@ export default function EquipoTable({ jugadores, nombreEquipo }) {
                       <td className="px-3 py-3 text-right text-muted">{j.minutosMedia.toFixed(0)}</td>
                       <td className="px-3 py-3 text-right font-semibold text-foreground">{j.goles}</td>
                       <td className="px-3 py-3 text-right font-semibold text-foreground">{j.mvps}</td>
+                      <td className="px-3 py-3 text-right text-muted">{j.jornadasEnEquipo}</td>
                       <td className="px-3 py-3 text-right font-semibold text-neon-green">{j.vecesTitularFalm}</td>
                       <td className="px-3 py-3 text-right font-semibold text-foreground">{j.puntosTotales}</td>
                       <td className="px-3 py-3 text-right font-semibold text-neon-green">{j.puntosAprovechados}</td>
