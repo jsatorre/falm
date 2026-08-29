@@ -5,6 +5,7 @@ import {
   getLeagueScoreId,
   fotoJugadorUrl,
 } from "./integrations/biwenger";
+import { supabase } from "./supabaseServer";
 
 const POSICION = {
   1: { codigo: "PT", nombre: "Portero" },
@@ -14,22 +15,46 @@ const POSICION = {
 };
 
 /**
- * Estadísticas de cada jugador de la plantilla de un equipo: una llamada
- * por jugador a Biwenger (además de la plantilla y las alineaciones), así
- * que esto NO es para consultar en cada refresco — se cachea aparte (ver
- * calcularEstadisticasEquipoCacheado).
+ * IDs de jornada de Biwenger (biwenger_round_id) que cuentan para vuestra
+ * liga cara a cara — exactamente las jornadas de Liga que tienen un
+ * enfrentamiento asignado (las mismas que usa la Clasificación). Ni la
+ * pretemporada de fichajes ni una jornada que hayáis aplazado desde
+ * /admin (ver aplazar-jornada) cuentan para ninguna estadística de
+ * Equipo — es el mismo criterio en toda la app.
+ */
+async function getJornadasLigaEnJuego() {
+  const [{ data: fixtureRoundIds }, { data: rounds }] = await Promise.all([
+    supabase.from("fixtures").select("round_id"),
+    supabase.from("rounds").select("id, biwenger_round_id"),
+  ]);
+
+  const roundIdsConFixture = new Set(fixtureRoundIds.map((f) => f.round_id));
+  return new Set(
+    rounds.filter((r) => roundIdsConFixture.has(r.id)).map((r) => String(r.biwenger_round_id))
+  );
+}
+
+/**
+ * Estadísticas de cada jugador de la plantilla de un equipo, solo desde
+ * que vuestra liga cara a cara está en marcha (ver getJornadasLigaEnJuego).
+ * Una llamada por jugador a Biwenger (además de la plantilla y las
+ * alineaciones), así que esto NO es para consultar en cada refresco — se
+ * cachea aparte (ver calcularEstadisticasEquipoCacheado).
  */
 export async function calcularEstadisticasEquipo(biwengerTeamId) {
-  const [plantilla, alineaciones, scoreId] = await Promise.all([
+  const [plantilla, alineacionesTodas, scoreId, jornadasEnJuego] = await Promise.all([
     getPlantilla(biwengerTeamId),
     getAlineacionesPorJornada(biwengerTeamId),
     getLeagueScoreId(),
+    getJornadasLigaEnJuego(),
   ]);
+
+  const alineaciones = alineacionesTodas.filter((a) => jornadasEnJuego.has(String(a.round?.id)));
 
   return Promise.all(
     plantilla.map(async (ownership) => {
       const ficha = await getFichaJugador(ownership.id);
-      return construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId);
+      return construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, jornadasEnJuego);
     })
   );
 }
@@ -48,8 +73,9 @@ function puntosSegunLiga(report, scoreId) {
   return (stats.score3 ?? 0) + (stats.mvp ? 1 : 0) + (stats.win ? 1 : 0);
 }
 
-function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId) {
-  const reports = ficha.reports ?? [];
+function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, jornadasEnJuego) {
+  const todosLosReports = ficha.reports ?? [];
+  const reports = todosLosReports.filter((r) => jornadasEnJuego.has(String(r.match?.round?.id)));
   const titularesPorRonda = new Map(alineaciones.map((a) => [a.round?.id, a.players ?? []]));
   // owner.date viene en epoch segundos, igual que match.date — comparables
   // directamente para saber si ya lo tenías fichado cuando se jugó ese partido.
