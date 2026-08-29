@@ -42,12 +42,12 @@ export default async function EquipoPage() {
 
       {!error && jugadores.length > 0 && (
         <div className="mt-6">
-          <EquipoTable jugadores={jugadores} />
+          <EquipoTable jugadores={jugadores} nombreEquipo={equipo?.name ?? "tu equipo"} />
         </div>
       )}
 
       <p className="mt-4 text-xs text-muted">
-        PJ club / minutos / goles: lo que ha hecho de verdad con su equipo de Liga. "Titular FALM":
+        PJ club / minutos / goles: lo que ha hecho de verdad con su equipo de Liga. "Titular":
         jornadas en las que lo pusiste en tu once — todavía no está confirmado si Biwenger refleja
         aquí el once que pones tú o el once ya con los suplentes automáticos aplicados, lo iremos
         viendo con datos reales. Haz clic en cualquier cabecera de columna para ordenar.

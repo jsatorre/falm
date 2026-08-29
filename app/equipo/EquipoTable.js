@@ -9,19 +9,24 @@ const POSICIONES = [
   { codigo: "DL", nombre: "Delanteros" },
 ];
 
-const COLUMNAS = [
-  { key: "nombre", label: "Jugador", align: "left" },
-  { key: "club", label: "Club", align: "left" },
-  { key: "partidosJugados", label: "PJ club", align: "right" },
-  { key: "minutosTotal", label: "Min. totales", align: "right" },
-  { key: "minutosMedia", label: "Min. media", align: "right" },
-  { key: "goles", label: "⚽", align: "right" },
-  { key: "mvps", label: "⭐", align: "right" },
-  { key: "vecesTitularFalm", label: "Titular FALM", align: "right" },
-  { key: "puntosTotales", label: "Puntos", align: "right" },
-];
+function columnas(nombreEquipo) {
+  return [
+    { key: "nombre", label: "Jugador", align: "left" },
+    { key: "club", label: "Club", align: "left" },
+    { key: "partidosJugados", label: "PJ club", align: "right" },
+    { key: "minutosTotal", label: "Min. totales", align: "right" },
+    { key: "minutosMedia", label: "Min. media", align: "right" },
+    { key: "goles", label: "⚽", align: "right" },
+    { key: "mvps", label: "⭐", align: "right" },
+    { key: "vecesTitularFalm", label: `Titular ${nombreEquipo}`, align: "right" },
+    { key: "puntosTotales", label: "Pts", align: "right" },
+    { key: "puntosAprovechados", label: "✅ Pts", align: "right" },
+    { key: "puntosDesperdiciados", label: "❌ Pts", align: "right" },
+  ];
+}
 
-export default function EquipoTable({ jugadores }) {
+export default function EquipoTable({ jugadores, nombreEquipo }) {
+  const COLUMNAS = columnas(nombreEquipo);
   const [posicion, setPosicion] = useState("TODOS");
   const [club, setClub] = useState("TODOS");
   const [busqueda, setBusqueda] = useState("");
@@ -120,7 +125,7 @@ export default function EquipoTable({ jugadores }) {
                   {grupo.nombre}
                 </p>
               )}
-              <table className="w-full min-w-[680px] border-collapse text-sm">
+              <table className="w-full min-w-[820px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
                     {COLUMNAS.map((col) => (
@@ -167,12 +172,9 @@ export default function EquipoTable({ jugadores }) {
                       <td className="px-3 py-3 text-right font-semibold text-foreground">{j.goles}</td>
                       <td className="px-3 py-3 text-right font-semibold text-foreground">{j.mvps}</td>
                       <td className="px-3 py-3 text-right font-semibold text-neon-green">{j.vecesTitularFalm}</td>
-                      <td className="px-3 py-3 text-right">
-                        <span className="font-semibold text-foreground">{j.puntosTotales}</span>
-                        <br />
-                        <span className="text-[11px] text-neon-green">✅{j.puntosAprovechados}</span>{" "}
-                        <span className="text-[11px] text-neon-pink">❌{j.puntosDesperdiciados}</span>
-                      </td>
+                      <td className="px-3 py-3 text-right font-semibold text-foreground">{j.puntosTotales}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-neon-green">{j.puntosAprovechados}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-neon-pink">{j.puntosDesperdiciados}</td>
                     </tr>
                   ))}
                 </tbody>
