@@ -94,3 +94,34 @@ create table if not exists app_settings (
     key text primary key,
     value text
 );
+
+-- Draft: tablero en vivo por turnos sobre el pool completo de La Liga
+-- (jugadores en sí NO se guardan aquí, se leen en vivo de la API pública de
+-- Biwenger — ver app/lib/draftEngine.js). Fichar en el draft es solo un
+-- apunte interno, no compra de verdad al jugador en Biwenger.
+create table if not exists draft_state (
+    id boolean primary key default true,
+    team_order jsonb not null default '[]'::jsonb,
+    current_pick integer not null default 0,
+    pick_size integer not null default 22,
+    started_at timestamptz,
+    finished_at timestamptz,
+    check (id)
+);
+
+create table if not exists draft_picks (
+    id uuid primary key default gen_random_uuid(),
+    pick_index integer not null unique,
+    team_id uuid not null references teams(id),
+    player_id integer not null unique,
+    player_name text not null,
+    player_club text,
+    created_at timestamptz not null default now()
+);
+
+create table if not exists draft_wishlist (
+    team_id uuid not null references teams(id),
+    player_id integer not null,
+    created_at timestamptz not null default now(),
+    primary key (team_id, player_id)
+);

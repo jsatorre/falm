@@ -1,10 +1,12 @@
 import { getCaraACaraRounds } from "../lib/caraACaraRounds";
+import { getEstadoDraft } from "../lib/draftEngine";
 import AplazarJornadaForm from "./AplazarJornadaForm";
 import FichajesDeadlineForm from "./FichajesDeadlineForm";
+import DraftAdminForm from "./DraftAdminForm";
 import AdminLogoutButton from "./AdminLogoutButton";
 
 export default async function AdminPage() {
-  const rounds = await getCaraACaraRounds();
+  const [rounds, draft] = await Promise.all([getCaraACaraRounds(), getEstadoDraft()]);
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
@@ -38,6 +40,24 @@ export default async function AdminPage() {
           jornada ya toma la hora tope de la semana siguiente.
         </p>
         <FichajesDeadlineForm />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Draft
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Sortea el orden serpiente y arranca el tablero de fichajes en vivo. Fichar aquí es solo
+          apunte interno de la app — luego cada uno tiene que comprar de verdad a su jugador en
+          Biwenger.
+        </p>
+        <DraftAdminForm
+          configurado={draft.configurado}
+          enMarcha={draft.enMarcha}
+          ronda={draft.ronda}
+          currentPick={draft.currentPick}
+          totalPicks={draft.totalPicks}
+        />
       </section>
 
       <section>
