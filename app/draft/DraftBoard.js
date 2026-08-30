@@ -379,7 +379,6 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
           equipoDe={equipoDe}
           equipoTurno={equipoTurno}
           miProximoPaso={miProximoPaso}
-          proximos={proximos}
           misJugadores={misJugadores}
           miTeamId={miTeamId}
           retirando={retirando}
@@ -413,9 +412,10 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
  * esencial; al tocarlo se despliega el resto (cola de turnos, tu
  * plantilla, botón de retirarte).
  */
-function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, proximos, misJugadores, miTeamId, retirando, onRetirar }) {
+function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugadores, miTeamId, retirando, onRetirar }) {
   const [abierto, setAbierto] = useState(false);
   const miEquipo = equipoDe(miTeamId);
+  const rondaDerecha = datos.ronda != null ? (datos.ronda - 1) % 2 === 0 : true;
 
   return (
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
@@ -450,45 +450,56 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, proximos, 
             </p>
           )}
 
-          {proximos.length > 0 && (
-            <div className="mt-3 flex max-h-64 flex-col gap-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]">
-              {proximos.slice(0, 12).map((p) => {
-                const equipo = equipoDe(p.teamId);
-                const esAhora = p.pasos === 0;
-                const esYo = p.teamId === miTeamId;
-                return (
-                  <div
-                    key={p.pickIndex}
-                    className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
-                      esAhora
-                        ? "border-neon-green/60 bg-neon-green/10"
-                        : esYo
-                          ? "border-neon-pink/60 bg-neon-pink/5"
-                          : "border-transparent"
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={equipo?.crest_url}
-                      alt=""
-                      className={`h-8 w-8 shrink-0 rounded-full border-2 object-cover ${
-                        esAhora ? "animate-pulse border-neon-green" : esYo ? "border-neon-pink" : "border-border"
-                      }`}
-                    />
-                    <span className={`flex-1 truncate text-xs ${esYo ? "font-bold text-neon-pink" : "text-foreground"}`}>
-                      {equipo?.name}
-                    </span>
-                    <span
-                      title={p.derecha ? "Esta ronda avanza en este sentido" : "Esta ronda va al revés (serpiente)"}
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        esAhora ? "bg-neon-green text-black" : "bg-background text-muted"
-                      }`}
+          {datos.teamOrder.length > 0 && (
+            <div className="mt-3">
+              <p className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted">
+                Orden del draft
+                <span
+                  title={rondaDerecha ? "Esta ronda avanza en este sentido" : "Esta ronda va al revés (serpiente)"}
+                  className="text-sm font-bold text-neon-green"
+                >
+                  {rondaDerecha ? "→" : "←"}
+                </span>
+              </p>
+              <div className="flex flex-col gap-1">
+                {datos.teamOrder.map((teamId) => {
+                  const equipo = equipoDe(teamId);
+                  const esAhora = teamId === datos.turnoDeTeamId;
+                  const esYo = teamId === miTeamId;
+                  const retirado = (datos.retirados ?? []).includes(teamId);
+                  return (
+                    <div
+                      key={teamId}
+                      className={`flex items-center gap-2 rounded-lg border px-2 py-1 ${
+                        esAhora
+                          ? "border-neon-green/60 bg-neon-green/10"
+                          : esYo
+                            ? "border-neon-pink/60 bg-neon-pink/5"
+                            : "border-transparent"
+                      } ${retirado ? "opacity-40" : ""}`}
                     >
-                      {p.derecha ? "→" : "←"}
-                    </span>
-                  </div>
-                );
-              })}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={equipo?.crest_url}
+                        alt=""
+                        className={`h-6 w-6 shrink-0 rounded-full border-2 object-cover ${
+                          esAhora ? "animate-pulse border-neon-green" : esYo ? "border-neon-pink" : "border-border"
+                        }`}
+                      />
+                      <span
+                        className={`flex-1 truncate text-[11px] ${
+                          retirado ? "line-through text-muted" : esYo ? "font-bold text-neon-pink" : "text-foreground"
+                        }`}
+                      >
+                        {equipo?.name}
+                      </span>
+                      {esAhora && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-neon-green">Ahora</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
