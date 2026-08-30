@@ -22,6 +22,8 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [soloMiEquipo, setSoloMiEquipo] = useState(false);
   const [ficharEnCurso, setFicharEnCurso] = useState(null); // playerId en vuelo
   const [error, setError] = useState(null);
+  const [pendienteFichar, setPendienteFichar] = useState(null); // jugador a confirmar, o null
+  const [pendienteRetiro, setPendienteRetiro] = useState(false);
 
   const refrescar = useCallback(async () => {
     const res = await fetch("/api/draft", { cache: "no-store" });
@@ -33,9 +35,9 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     return () => clearInterval(id);
   }, [refrescar]);
 
-  async function fichar(jugador) {
-    if (!confirm(`¿Fichar a ${jugador.nombre} (${jugador.club})?`)) return;
-
+  async function ficharConfirmado() {
+    const jugador = pendienteFichar;
+    setPendienteFichar(null);
     setFicharEnCurso(jugador.id);
     setError(null);
     try {
@@ -57,12 +59,8 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
 
   const [retirando, setRetirando] = useState(false);
 
-  async function alternarRetiro() {
-    const mensaje = datos.estoyRetirado
-      ? "¿Volver a fichar? Recuperarás turno en tu siguiente hueco."
-      : "¿Seguro que no quieres fichar más jugadores? Se saltarán tus turnos hasta que le vuelvas a dar aquí.";
-    if (!confirm(mensaje)) return;
-
+  async function retiroConfirmado() {
+    setPendienteRetiro(false);
     setRetirando(true);
     try {
       const res = await fetch("/api/draft/retirar", { method: "POST" });
@@ -176,7 +174,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
           )}
           <button
             type="button"
-            onClick={alternarRetiro}
+            onClick={() => setPendienteRetiro(true)}
             disabled={retirando}
             className={`ml-auto rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
               datos.estoyRetirado
@@ -320,7 +318,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
                       {!j.ocupado && !datos.terminado && (
                         <button
                           type="button"
-                          onClick={() => fichar(j)}
+                          onClick={() => setPendienteFichar(j)}
                           disabled={!datos.esMiTurno || ficharEnCurso === j.id}
                           className="rounded-lg bg-neon-pink px-3 py-1.5 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-30"
                           title={datos.esMiTurno ? "Fichar" : "Solo puede fichar quien tenga el turno"}
@@ -344,6 +342,70 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         Fichar aquí es solo un apunte interno del draft, no compra al jugador de verdad en
         Biwenger — cada uno tiene que ir luego al mercado de Biwenger y comprarlo él mismo.
       </p>
+
+      {pendienteFichar && (
+        <ConfirmModal
+          titulo="¿Fichar a este jugador?"
+          onCancelar={() => setPendienteFichar(null)}
+          onConfirmar={ficharConfirmado}
+          textoConfirmar="Fichar"
+          colorConfirmar="bg-neon-pink text-black"
+        >
+          <p className="text-lg font-bold text-foreground">{pendienteFichar.nombre}</p>
+          <p className="text-sm text-muted">
+            {pendienteFichar.posicionCodigo} · {pendienteFichar.club}
+          </p>
+        </ConfirmModal>
+      )}
+
+      {pendienteRetiro && (
+        <ConfirmModal
+          titulo={datos.estoyRetirado ? "¿Volver a fichar?" : "¿Ya no quieres fichar más jugadores?"}
+          onCancelar={() => setPendienteRetiro(false)}
+          onConfirmar={retiroConfirmado}
+          textoConfirmar={datos.estoyRetirado ? "Volver a fichar" : "Sí, no quiero más"}
+          colorConfirmar="bg-neon-green text-black"
+        >
+          <p className="text-sm text-muted">
+            {datos.estoyRetirado
+              ? "Recuperarás turno en tu siguiente hueco de la ronda."
+              : "Tus turnos futuros se saltarán solos hasta que le des a \"Volver a fichar\" — puedes deshacerlo cuando quieras."}
+          </p>
+        </ConfirmModal>
+      )}
+    </div>
+  );
+}
+
+function ConfirmModal({ titulo, children, onCancelar, onConfirmar, textoConfirmar, colorConfirmar }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+      onClick={onCancelar}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl border border-border bg-background-elevated p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-xs font-semibold uppercase tracking-wider text-neon-purple">{titulo}</p>
+        <div className="mt-2">{children}</div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancelar}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted transition hover:border-white/20 hover:text-foreground"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90 ${colorConfirmar}`}
+          >
+            {textoConfirmar}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
