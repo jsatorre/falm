@@ -40,7 +40,7 @@ async function syncEstadosDeJornada() {
       .from("rounds")
       .update({ status: cambio.status })
       .eq("id", cambio.id);
-    if (updateError) console.error(`No se ha podido actualizar el estado de la ronda ${cambio.id}:`, updateError);
+    if (updateError) console.warn(`No se ha podido actualizar el estado de la ronda ${cambio.id}:`, updateError);
   }
 }
 

@@ -47,15 +47,17 @@ async function cargarPoolCompleto() {
  * Quién tiene ya fichado (de verdad, en Biwenger) a cada jugador —
  * independiente del draft. Sirve tanto para excluir del pool disponible
  * como para el tope de jugadores por club real. Son 12 llamadas en
- * paralelo a Biwenger (una por equipo); con el draft en marcha el tablero
- * hace polling cada 5s desde varios móviles a la vez, así que sin caché
- * esto dispara fácilmente un 429 de Biwenger — se cachea un rato corto
- * (no hace falta que sea al segundo: nadie ficha de verdad en Biwenger
- * mientras el draft está en marcha) y, si una carga falla, se sirve la
- * última copia buena en vez de tumbar la página entera.
+ * paralelo a Biwenger (una por equipo) con la cuenta PERSONAL de Jaime (el
+ * login del servidor usa sus credenciales) — así que el límite de
+ * peticiones de Biwenger lo comparte con su propio uso normal de la app o
+ * la web real. Con el draft en marcha el tablero hace polling cada 5s
+ * desde varios móviles a la vez, así que sin un caché largo esto puede
+ * dejar a Jaime sin poder ni subir su alineación en Biwenger. 5 min es de
+ * sobra (nadie ficha de verdad mientras el draft está en marcha) y, si una
+ * carga falla, se sirve la última copia buena en vez de tumbar la página.
  */
 let propietariosCache = null; // { ts, data }
-const PROPIETARIOS_CACHE_MS = 20 * 1000;
+const PROPIETARIOS_CACHE_MS = 5 * 60 * 1000;
 
 export async function getPropietariosBiwenger(teams) {
   const ahora = Date.now();
@@ -75,7 +77,10 @@ export async function getPropietariosBiwenger(teams) {
     propietariosCache = { ts: ahora, data: propietarios };
     return propietarios;
   } catch (err) {
-    console.error("No se ha podido refrescar la propiedad real de Biwenger para el draft:", err);
+    // console.warn, no console.error: esto ya está controlado (se sirve la
+    // última copia buena o un mapa vacío) — con console.error, el overlay de
+    // Next en desarrollo lo pinta como si la página se hubiera roto.
+    console.warn("No se ha podido refrescar la propiedad real de Biwenger para el draft:", err);
     if (propietariosCache) return propietariosCache.data; // mejor una copia algo vieja que tumbar la página
     return new Map();
   }
@@ -136,7 +141,7 @@ export async function getEstadoDraft() {
         .from("draft_state")
         .update({ current_pick: currentPick })
         .eq("id", true);
-      if (skipError) console.error("No se ha podido guardar el salto de turnos retirados:", skipError);
+      if (skipError) console.warn("No se ha podido guardar el salto de turnos retirados:", skipError);
     }
   }
 

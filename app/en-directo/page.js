@@ -8,7 +8,7 @@ export default async function EnDirectoPage() {
   try {
     await syncBiwengerResultsCached();
   } catch (err) {
-    console.error("No se ha podido sincronizar con Biwenger:", err);
+    console.warn("No se ha podido sincronizar con Biwenger:", err);
   }
 
   const datos = await getRondaEnDirecto();

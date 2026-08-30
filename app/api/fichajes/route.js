@@ -66,7 +66,7 @@ export async function GET(request) {
   try {
     jugadoresLibres = await getJugadoresLibres();
   } catch (err) {
-    console.error("No se ha podido cargar la lista de jugadores libres para fichajes:", err);
+    console.warn("No se ha podido cargar la lista de jugadores libres para fichajes:", err);
     libresError = true;
   }
 
