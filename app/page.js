@@ -140,7 +140,9 @@ export default async function ClasificacionPage() {
                   {fila.dp > 0 ? `+${fila.dp}` : fila.dp}
                 </td>
                 <td className="px-3 py-3 text-right text-muted">{fila.mp.toFixed(1)}</td>
-                <td className="px-3 py-3 text-right text-muted">{fila.jg}</td>
+                <td className="px-3 py-3 text-right text-muted">
+                  {Number.isInteger(fila.jg) ? fila.jg : fila.jg.toFixed(1)}
+                </td>
                 <td className="px-3 py-3">
                   <Racha resultados={fila.racha} />
                 </td>
@@ -156,8 +158,9 @@ export default async function ClasificacionPage() {
         (entre 2 y 4) · 1.5 empate técnico (diferencia de -1 a +1) · 1 derrota
         ajustada (pierdes por 2-4) · 0 derrota clara (pierdes por 5 o más). JG:
         jornadas en las que has sido el que más puntos Biwenger ha sacado esa
-        semana. Racha: tus últimos 5 enfrentamientos, de más antiguo
-        (izquierda) a más reciente (derecha).
+        semana — si empatáis varios en el máximo, se reparte a partes iguales
+        (2 empatados, 0.5 cada uno; 3, un tercio; etc). Racha: tus últimos 5
+        enfrentamientos, de más antiguo (izquierda) a más reciente (derecha).
       </p>
     </main>
   );

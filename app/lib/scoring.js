@@ -77,8 +77,10 @@ export function calcularClasificacion(teams, fixtures, results, hastaJornada) {
         if (pts > max) max = pts;
       }
     }
-    for (const { teamId, pts } of puntosPorEquipo) {
-      if (pts === max) tabla.get(teamId).jg += 1;
+    const empatados = puntosPorEquipo.filter((p) => p.pts === max);
+    const parte = 1 / empatados.length; // empate a 2 -> 0.5 cada uno, a 3 -> 1/3, etc.
+    for (const { teamId } of empatados) {
+      tabla.get(teamId).jg += parte;
     }
   }
 
