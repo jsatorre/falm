@@ -29,10 +29,11 @@ function proximosTurnos(datos, cantidad) {
   while (resultado.length < cantidad && pick < totalPicks) {
     const ronda0 = Math.floor(pick / n);
     const posEnRonda = pick % n;
-    const ordenRonda = ronda0 % 2 === 0 ? teamOrder : [...teamOrder].reverse();
+    const derecha = ronda0 % 2 === 0; // ronda "normal" recorre teamOrder hacia delante, la siguiente al revés
+    const ordenRonda = derecha ? teamOrder : [...teamOrder].reverse();
     const teamId = ordenRonda[posEnRonda];
     if (!retiradoSet.has(teamId)) {
-      resultado.push({ teamId, pasos: resultado.length, pickIndex: pick });
+      resultado.push({ teamId, pasos: resultado.length, pickIndex: pick, derecha });
     }
     pick += 1;
   }
@@ -202,95 +203,10 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
       <p className="text-xs font-medium uppercase tracking-[0.3em] text-neon-purple">Draft</p>
       <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Tablero en vivo</h1>
 
-      {datos.terminado ? (
+      {datos.terminado && (
         <p className="mt-4 rounded-xl border border-neon-green/40 bg-neon-green/10 px-4 py-3 text-sm text-neon-green">
           Draft terminado — {datos.totalPicks} jugadores fichados entre los {datos.equipos.length} equipos.
         </p>
-      ) : (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-background-elevated px-4 py-3">
-          <span className="rounded-full bg-neon-pink/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-neon-pink">
-            Pick {datos.currentPick + 1} / {datos.totalPicks} · Ronda {datos.ronda}
-          </span>
-          <span className="rounded-full border border-border px-2.5 py-1 text-[10px] text-muted">
-            Tu plantilla: {misJugadores.length} / {datos.pickSize}
-          </span>
-          {equipoTurno && (
-            <span className="flex items-center gap-2 text-sm">
-              <span className="text-muted">Turno de</span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={equipoTurno.crest_url} alt="" className="h-6 w-6 rounded-full object-cover" />
-              <span className="font-bold text-foreground">{equipoTurno.name}</span>
-            </span>
-          )}
-          {datos.esMiTurno && (
-            <span className="animate-pulse rounded-full bg-neon-green px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-black">
-              ¡Es tu turno!
-            </span>
-          )}
-          {!datos.esMiTurno && !datos.estoyRetirado && miProximoPaso != null && (
-            <span className="rounded-full border border-neon-green/50 px-2.5 py-1 text-[10px] font-semibold text-neon-green">
-              Te toca en {miProximoPaso} {miProximoPaso === 1 ? "turno" : "turnos"}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setPendienteRetiro(true)}
-            disabled={retirando}
-            className={`ml-auto rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
-              datos.estoyRetirado
-                ? "border-neon-green text-neon-green hover:bg-neon-green/10"
-                : "border-border text-muted hover:border-neon-pink hover:text-neon-pink"
-            }`}
-          >
-            {datos.estoyRetirado ? "Volver a fichar" : "Ya no quiero más jugadores"}
-          </button>
-        </div>
-      )}
-
-      {datos.estoyRetirado && (
-        <p className="mt-3 rounded-lg border border-neon-orange/40 bg-neon-orange/10 px-3 py-2 text-xs text-neon-orange">
-          Has renunciado a fichar más jugadores — tus turnos se saltan automáticamente. Puedes
-          deshacerlo cuando quieras con el botón de arriba.
-        </p>
-      )}
-
-      {!datos.terminado && proximos.length > 0 && (
-        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {proximos.slice(0, 10).map((p) => {
-            const equipo = equipoDe(p.teamId);
-            const esAhora = p.pasos === 0;
-            const esYo = p.teamId === miTeamId;
-            return (
-              <div key={p.pickIndex} className="flex shrink-0 flex-col items-center gap-1">
-                <div className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={equipo?.crest_url}
-                    alt=""
-                    title={equipo?.name}
-                    className={`h-11 w-11 rounded-full border-2 object-cover ${
-                      esAhora
-                        ? "animate-pulse border-neon-green"
-                        : esYo
-                          ? "border-neon-pink"
-                          : "border-border"
-                    }`}
-                  />
-                  <span
-                    className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
-                      esAhora ? "bg-neon-green text-black" : "bg-background-elevated text-muted"
-                    }`}
-                  >
-                    {p.pasos}
-                  </span>
-                </div>
-                <span className={`max-w-[3.5rem] truncate text-[9px] ${esYo ? "font-bold text-neon-pink" : "text-muted"}`}>
-                  {equipo?.name}
-                </span>
-              </div>
-            );
-          })}
-        </div>
       )}
 
       {ultimosPicks.length > 0 && (
@@ -457,6 +373,20 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         </ConfirmModal>
       )}
 
+      {!datos.terminado && (
+        <TurnoFlotante
+          datos={datos}
+          equipoDe={equipoDe}
+          equipoTurno={equipoTurno}
+          miProximoPaso={miProximoPaso}
+          proximos={proximos}
+          misJugadores={misJugadores}
+          miTeamId={miTeamId}
+          retirando={retirando}
+          onRetirar={() => setPendienteRetiro(true)}
+        />
+      )}
+
       {pendienteRetiro && (
         <ConfirmModal
           titulo={datos.estoyRetirado ? "¿Volver a fichar?" : "¿Ya no quieres fichar más jugadores?"}
@@ -472,6 +402,126 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
           </p>
         </ConfirmModal>
       )}
+    </div>
+  );
+}
+
+/**
+ * Widget flotante fijo en la esquina — para que sepas de un vistazo si te
+ * toca (o cuánto falta) aunque estés con la tabla de jugadores, sin que el
+ * bloque de turno ocupe pantalla todo el rato. Colapsado solo enseña lo
+ * esencial; al tocarlo se despliega el resto (cola de turnos, tu
+ * plantilla, botón de retirarte).
+ */
+function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, proximos, misJugadores, miTeamId, retirando, onRetirar }) {
+  const [abierto, setAbierto] = useState(false);
+  const miEquipo = equipoDe(miTeamId);
+
+  return (
+    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+      {abierto && (
+        <div className="w-[min(90vw,360px)] rounded-2xl border border-border bg-background-elevated p-4 shadow-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="rounded-full bg-neon-pink/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-neon-pink">
+              Pick {datos.currentPick + 1} / {datos.totalPicks} · Ronda {datos.ronda}
+            </span>
+            <button type="button" onClick={() => setAbierto(false)} className="text-muted hover:text-foreground">
+              ✕
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border px-2.5 py-1 text-[10px] text-muted">
+              Tu plantilla: {misJugadores.length} / {datos.pickSize}
+            </span>
+            {equipoTurno && (
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted">Turno de</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={equipoTurno.crest_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+                <span className="font-bold text-foreground">{equipoTurno.name}</span>
+              </span>
+            )}
+          </div>
+
+          {datos.estoyRetirado && (
+            <p className="mt-3 rounded-lg border border-neon-orange/40 bg-neon-orange/10 px-3 py-2 text-xs text-neon-orange">
+              Has renunciado a fichar más jugadores — tus turnos se saltan automáticamente.
+            </p>
+          )}
+
+          {proximos.length > 0 && (
+            <div className="mt-3 flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {proximos.slice(0, 12).map((p) => {
+                const equipo = equipoDe(p.teamId);
+                const esAhora = p.pasos === 0;
+                const esYo = p.teamId === miTeamId;
+                return (
+                  <div key={p.pickIndex} className="flex shrink-0 flex-col items-center gap-1">
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={equipo?.crest_url}
+                        alt=""
+                        title={equipo?.name}
+                        className={`h-10 w-10 rounded-full border-2 object-cover ${
+                          esAhora ? "animate-pulse border-neon-green" : esYo ? "border-neon-pink" : "border-border"
+                        }`}
+                      />
+                      <span
+                        title={p.derecha ? "Esta ronda avanza en este sentido" : "Esta ronda va al revés (serpiente)"}
+                        className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                          esAhora ? "bg-neon-green text-black" : "bg-background-elevated text-muted"
+                        }`}
+                      >
+                        {p.derecha ? "→" : "←"}
+                      </span>
+                    </div>
+                    <span className={`max-w-[3rem] truncate text-[9px] ${esYo ? "font-bold text-neon-pink" : "text-muted"}`}>
+                      {equipo?.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onRetirar}
+            disabled={retirando}
+            className={`mt-3 w-full rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
+              datos.estoyRetirado
+                ? "border-neon-green text-neon-green hover:bg-neon-green/10"
+                : "border-border text-muted hover:border-neon-pink hover:text-neon-pink"
+            }`}
+          >
+            {datos.estoyRetirado ? "Volver a fichar" : "Ya no quiero más jugadores"}
+          </button>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className={`flex items-center gap-2 rounded-full border-2 py-2 pl-2 pr-4 shadow-xl transition ${
+          datos.esMiTurno
+            ? "animate-pulse border-neon-green bg-neon-green/10"
+            : "border-border bg-background-elevated"
+        }`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={miEquipo?.crest_url} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
+        <span className={`text-xs font-bold ${datos.esMiTurno ? "text-neon-green" : "text-foreground"}`}>
+          {datos.esMiTurno
+            ? "¡TU TURNO!"
+            : datos.estoyRetirado
+              ? "Retirado"
+              : miProximoPaso != null
+                ? `Te toca en ${miProximoPaso}`
+                : "Draft"}
+        </span>
+      </button>
     </div>
   );
 }
