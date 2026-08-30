@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Logo from "../components/Logo";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -44,9 +45,10 @@ export default function LoginForm() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-8 px-4 py-16">
-      <div className="text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.3em] text-neon-purple">FALM</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">¿Quién eres tú? ⚽</h1>
+      <div className="flex flex-col items-center text-center">
+        <Logo className="h-16 w-16" />
+        <p className="mt-3 text-sm font-medium uppercase tracking-[0.3em] text-neon-purple">FALM</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">¿Quién eres tú?</h1>
         <p className="mt-2 text-sm text-muted">
           Elige tu equipo y mete tu PIN para entrar a tu zona privada.
         </p>

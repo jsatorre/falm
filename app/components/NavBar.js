@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseServer";
 import LogoutButton from "./LogoutButton";
+import Logo from "./Logo";
 
 const TABS = [
   { href: "/", label: "Clasificación", icon: "🏆" },
@@ -29,7 +30,7 @@ export default async function NavBar() {
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/85 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 pt-3">
         <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
-          <span className="text-lg">⚽</span>
+          <Logo className="h-7 w-7" />
           <span className="hidden sm:inline">FALM</span>
         </div>
 

@@ -1,0 +1,20 @@
+export default function Logo({ className }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id="falm-logo-g" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#a855f7" />
+          <stop offset="55%" stopColor="#ff2fb0" />
+          <stop offset="100%" stopColor="#22ff9a" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M32 2 L59 13 V30 C59 47 48 58 32 62 C16 58 5 47 5 30 V13 Z"
+        fill="#0b0b12"
+        stroke="url(#falm-logo-g)"
+        strokeWidth="3"
+      />
+      <path d="M23 18 H42 V24.5 H29.5 V29.5 H39 V36 H29.5 V47 H23 Z" fill="url(#falm-logo-g)" />
+    </svg>
+  );
+}
