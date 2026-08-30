@@ -151,10 +151,13 @@ export default async function ClasificacionPage() {
       </div>
 
       <p className="mt-4 text-xs text-muted">
-        Pts: 3 victoria clara · 2 victoria ajustada · 1.5 empate técnico (±1) ·
-        1 derrota ajustada · 0 derrota clara. JG: jornadas en las que has sido
-        el que más puntos Biwenger ha sacado esa semana. Racha: tus últimos 5
-        enfrentamientos, de más antiguo (izquierda) a más reciente (derecha).
+        Pts, según la diferencia de puntos Biwenger entre los dos equipos esa
+        jornada: 3 victoria clara (le sacas 5 o más) · 2 victoria ajustada
+        (entre 2 y 4) · 1.5 empate técnico (diferencia de -1 a +1) · 1 derrota
+        ajustada (pierdes por 2-4) · 0 derrota clara (pierdes por 5 o más). JG:
+        jornadas en las que has sido el que más puntos Biwenger ha sacado esa
+        semana. Racha: tus últimos 5 enfrentamientos, de más antiguo
+        (izquierda) a más reciente (derecha).
       </p>
     </main>
   );
