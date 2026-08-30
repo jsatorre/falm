@@ -451,34 +451,40 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, proximos, 
           )}
 
           {proximos.length > 0 && (
-            <div className="mt-3 flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mt-3 flex max-h-64 flex-col gap-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]">
               {proximos.slice(0, 12).map((p) => {
                 const equipo = equipoDe(p.teamId);
                 const esAhora = p.pasos === 0;
                 const esYo = p.teamId === miTeamId;
                 return (
-                  <div key={p.pickIndex} className="flex shrink-0 flex-col items-center gap-1">
-                    <div className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={equipo?.crest_url}
-                        alt=""
-                        title={equipo?.name}
-                        className={`h-10 w-10 rounded-full border-2 object-cover ${
-                          esAhora ? "animate-pulse border-neon-green" : esYo ? "border-neon-pink" : "border-border"
-                        }`}
-                      />
-                      <span
-                        title={p.derecha ? "Esta ronda avanza en este sentido" : "Esta ronda va al revés (serpiente)"}
-                        className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
-                          esAhora ? "bg-neon-green text-black" : "bg-background-elevated text-muted"
-                        }`}
-                      >
-                        {p.derecha ? "→" : "←"}
-                      </span>
-                    </div>
-                    <span className={`max-w-[3rem] truncate text-[9px] ${esYo ? "font-bold text-neon-pink" : "text-muted"}`}>
+                  <div
+                    key={p.pickIndex}
+                    className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
+                      esAhora
+                        ? "border-neon-green/60 bg-neon-green/10"
+                        : esYo
+                          ? "border-neon-pink/60 bg-neon-pink/5"
+                          : "border-transparent"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={equipo?.crest_url}
+                      alt=""
+                      className={`h-8 w-8 shrink-0 rounded-full border-2 object-cover ${
+                        esAhora ? "animate-pulse border-neon-green" : esYo ? "border-neon-pink" : "border-border"
+                      }`}
+                    />
+                    <span className={`flex-1 truncate text-xs ${esYo ? "font-bold text-neon-pink" : "text-foreground"}`}>
                       {equipo?.name}
+                    </span>
+                    <span
+                      title={p.derecha ? "Esta ronda avanza en este sentido" : "Esta ronda va al revés (serpiente)"}
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        esAhora ? "bg-neon-green text-black" : "bg-background text-muted"
+                      }`}
+                    >
+                      {p.derecha ? "→" : "←"}
                     </span>
                   </div>
                 );
