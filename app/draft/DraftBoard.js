@@ -415,7 +415,9 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
 function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugadores, miTeamId, retirando, onRetirar }) {
   const [abierto, setAbierto] = useState(false);
   const miEquipo = equipoDe(miTeamId);
-  const rondaDerecha = datos.ronda != null ? (datos.ronda - 1) % 2 === 0 : true;
+  // Lista vertical: "hacia abajo" = recorre el orden del sorteo de arriba a
+  // abajo (ronda normal), "hacia arriba" = de abajo a arriba (ronda invertida).
+  const rondaHaciaAbajo = datos.ronda != null ? (datos.ronda - 1) % 2 === 0 : true;
 
   return (
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
@@ -455,10 +457,10 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugador
               <p className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted">
                 Orden del draft
                 <span
-                  title={rondaDerecha ? "Esta ronda avanza en este sentido" : "Esta ronda va al revés (serpiente)"}
+                  title={rondaHaciaAbajo ? "Esta ronda avanza hacia abajo" : "Esta ronda va al revés, hacia arriba (serpiente)"}
                   className="text-sm font-bold text-neon-green"
                 >
-                  {rondaDerecha ? "→" : "←"}
+                  {rondaHaciaAbajo ? "↓" : "↑"}
                 </span>
               </p>
               <div className="flex flex-col gap-1">
