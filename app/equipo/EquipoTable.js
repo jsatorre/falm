@@ -126,7 +126,21 @@ export default function EquipoTable({ jugadores, nombreEquipo }) {
                   {grupo.nombre}
                 </p>
               )}
-              <table className="w-full min-w-[920px] border-collapse text-sm">
+              <table className="w-full min-w-[920px] table-fixed border-collapse text-sm">
+                <colgroup>
+                  <col className="w-[16%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[5%]" />
+                  <col className="w-[5%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[7.5%]" />
+                  <col className="w-[7.5%]" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
                     {COLUMNAS.map((col) => (
@@ -147,26 +161,26 @@ export default function EquipoTable({ jugadores, nombreEquipo }) {
                   {grupo.jugadores.map((j) => (
                     <tr key={j.id} className="border-b border-border/60 last:border-0 hover:bg-white/[0.03]">
                       <td className="px-3 py-3">
-                        <span className="flex items-center gap-3">
+                        <span className="flex min-w-0 items-center gap-3">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={j.foto}
                             alt=""
-                            className="h-9 w-9 rounded-full border border-border bg-background-elevated object-cover"
+                            className="h-9 w-9 shrink-0 rounded-full border border-border bg-background-elevated object-cover"
                           />
-                          <span className="flex flex-col">
+                          <span className="flex min-w-0 flex-col">
                             <span className="flex items-center gap-1.5 font-medium text-foreground">
-                              {j.nombre}
+                              <span className="truncate">{j.nombre}</span>
                               <span
                                 title={j.disponible ? "Disponible" : "Duda / lesión / sanción"}
-                                className={`h-2 w-2 rounded-full ${j.disponible ? "bg-neon-green" : "bg-neon-red"}`}
+                                className={`h-2 w-2 shrink-0 rounded-full ${j.disponible ? "bg-neon-green" : "bg-neon-pink"}`}
                               />
                             </span>
                             <span className="text-xs text-muted">{j.posicionCodigo}</span>
                           </span>
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-muted">{j.club}</td>
+                      <td className="truncate px-3 py-3 text-muted">{j.club}</td>
                       <td className="px-3 py-3 text-right text-muted">{j.partidosJugados}</td>
                       <td className="px-3 py-3 text-right text-muted">{j.minutosTotal}</td>
                       <td className="px-3 py-3 text-right text-muted">{j.minutosMedia.toFixed(0)}</td>

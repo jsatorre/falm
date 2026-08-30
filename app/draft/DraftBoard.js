@@ -24,6 +24,8 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [error, setError] = useState(null);
   const [pendienteFichar, setPendienteFichar] = useState(null); // jugador a confirmar, o null
   const [pendienteRetiro, setPendienteRetiro] = useState(false);
+  const [ordenPor, setOrdenPor] = useState("nombre"); // alfabético por defecto, la API de Biwenger no trae ningún orden útil
+  const [ordenAsc, setOrdenAsc] = useState(true);
 
   const refrescar = useCallback(async () => {
     const res = await fetch("/api/draft", { cache: "no-store" });
@@ -105,6 +107,29 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     });
   }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
 
+  function comparar(a, b) {
+    let va;
+    let vb;
+    if (ordenPor === "estado") {
+      va = a.ocupado ? a.teamName ?? "" : "";
+      vb = b.ocupado ? b.teamName ?? "" : "";
+    } else {
+      va = a[ordenPor];
+      vb = b[ordenPor];
+    }
+    const cmp = typeof va === "string" ? va.localeCompare(vb) : (va ?? -1) - (vb ?? -1);
+    return ordenAsc ? cmp : -cmp;
+  }
+
+  function alternarOrden(key) {
+    if (ordenPor === key) {
+      setOrdenAsc((a) => !a);
+    } else {
+      setOrdenPor(key);
+      setOrdenAsc(true);
+    }
+  }
+
   function alternarMiEquipo() {
     setSoloMiEquipo((v) => {
       const activar = !v;
@@ -126,9 +151,9 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     posicion === "TODOS"
       ? POSICIONES.map((p) => ({
           ...p,
-          jugadores: filtrados.filter((j) => j.posicionCodigo === p.codigo),
+          jugadores: filtrados.filter((j) => j.posicionCodigo === p.codigo).sort(comparar),
         })).filter((g) => g.jugadores.length > 0)
-      : [{ codigo: posicion, nombre: null, jugadores: filtrados }];
+      : [{ codigo: posicion, nombre: null, jugadores: [...filtrados].sort(comparar) }];
 
   if (!datos.configurado) {
     return (
@@ -281,9 +306,9 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
               <thead>
                 <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
                   <th className="px-3 py-3 font-medium">★</th>
-                  <th className="px-3 py-3 font-medium">Jugador</th>
-                  <th className="px-3 py-3 font-medium">Club</th>
-                  <th className="px-3 py-3 font-medium">Estado</th>
+                  <CabeceraOrdenable label="Jugador" campo="nombre" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
+                  <CabeceraOrdenable label="Club" campo="club" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
+                  <CabeceraOrdenable label="Estado" campo="estado" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
                   <th className="px-3 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -407,6 +432,18 @@ function ConfirmModal({ titulo, children, onCancelar, onConfirmar, textoConfirma
         </div>
       </div>
     </div>
+  );
+}
+
+function CabeceraOrdenable({ label, campo, ordenPor, ordenAsc, onClick }) {
+  return (
+    <th
+      onClick={() => onClick(campo)}
+      className="cursor-pointer select-none px-3 py-3 font-medium transition hover:text-foreground"
+    >
+      {label}
+      {ordenPor === campo && <span className="ml-1">{ordenAsc ? "▲" : "▼"}</span>}
+    </th>
   );
 }
 
