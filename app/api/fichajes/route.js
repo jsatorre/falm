@@ -64,7 +64,7 @@ export async function GET(request) {
   let jugadoresLibres = [];
   let libresError = false;
   try {
-    jugadoresLibres = await getJugadoresLibres();
+    jugadoresLibres = await getJugadoresLibres(ronda.id);
   } catch (err) {
     console.warn("No se ha podido cargar la lista de jugadores libres para fichajes:", err);
     libresError = true;

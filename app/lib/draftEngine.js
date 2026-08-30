@@ -44,20 +44,17 @@ async function cargarPoolCompleto() {
 }
 
 /**
- * Quién tiene ya fichado (de verdad, en Biwenger) a cada jugador —
- * independiente del draft. Sirve tanto para excluir del pool disponible
- * como para el tope de jugadores por club real. Son 12 llamadas en
- * paralelo a Biwenger (una por equipo) con la cuenta PERSONAL de Jaime (el
- * login del servidor usa sus credenciales) — así que el límite de
- * peticiones de Biwenger lo comparte con su propio uso normal de la app o
- * la web real. Con el draft en marcha el tablero hace polling cada 5s
- * desde varios móviles a la vez, así que sin un caché largo esto puede
- * dejar a Jaime sin poder ni subir su alineación en Biwenger. 5 min es de
- * sobra (nadie ficha de verdad mientras el draft está en marcha) y, si una
- * carga falla, se sirve la última copia buena en vez de tumbar la página.
+ * Quién tiene ya fichado (de verdad, en Biwenger) a cada jugador — 12
+ * llamadas en paralelo con la cuenta PERSONAL de Jaime (el login del
+ * servidor usa sus credenciales), así que cuestan de su propia cuota de
+ * peticiones. NO se llama en cada lectura del draft (ver getEstadoDraft) —
+ * solo la usan quien arranca un draft nuevo (para tomar la foto inicial,
+ * app/api/admin/draft/start/route.js) y Fichajes (getJugadoresLibres en
+ * fichajePool.js, con su propio caché por jornada). El caché corto de aquí
+ * es solo para no duplicar la llamada si dos cosas la piden casi a la vez.
  */
 let propietariosCache = null; // { ts, data }
-const PROPIETARIOS_CACHE_MS = 5 * 60 * 1000;
+const PROPIETARIOS_CACHE_MS = 60 * 1000;
 
 export async function getPropietariosBiwenger(teams) {
   const ahora = Date.now();
@@ -100,11 +97,18 @@ export async function getEstadoDraft() {
   ]);
 
   const equipoPorId = Object.fromEntries(teams.map((t) => [t.id, t]));
-  const propietariosBiwenger = await getPropietariosBiwenger(teams);
+
+  // La propiedad real de Biwenger NO se consulta en vivo aquí — se tomó
+  // una foto UNA sola vez al arrancar el draft (ver
+  // app/api/admin/draft/start/route.js) y se queda guardada en
+  // draft_state.ocupacion_biwenger durante todo el draft. Así el tablero
+  // puede hacer polling cada 5s desde varios móviles sin gastar ni una
+  // sola petición más a Biwenger que la del arranque.
+  const ocupacionBiwengerGuardada = estado?.ocupacion_biwenger ?? [];
 
   // playerId -> { teamId, origen: 'biwenger' | 'draft' }
   const ocupacion = new Map();
-  for (const [playerId, teamId] of propietariosBiwenger) {
+  for (const [playerId, teamId] of ocupacionBiwengerGuardada) {
     ocupacion.set(playerId, { teamId, origen: "biwenger" });
   }
   for (const pick of picks ?? []) {

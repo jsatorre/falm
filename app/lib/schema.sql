@@ -114,6 +114,12 @@ create table if not exists draft_state (
     -- equipos que han pulsado "Ya no quiero más jugadores" — se saltan sus
     -- turnos futuros automáticamente, reversible en cualquier momento.
     retired_teams jsonb not null default '[]'::jsonb,
+    -- foto de "quién tiene fichado a quién de verdad en Biwenger", tomada
+    -- UNA sola vez al arrancar el draft (no se refresca en vivo — durante
+    -- el draft nadie compra de verdad en Biwenger, así que no hace falta
+    -- gastar peticiones comprobándolo en cada poll). Array de pares
+    -- [playerId, teamId]. Ver app/lib/draftEngine.js.
+    ocupacion_biwenger jsonb,
     check (id)
 );
 
