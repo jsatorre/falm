@@ -11,6 +11,34 @@ const POSICIONES = [
   { codigo: "DL", nombre: "Delanteros" },
 ];
 
+/**
+ * Próximos `cantidad` turnos a partir de currentPick (0 = el turno actual),
+ * saltándose los equipos retirados — mismo cálculo de orden serpiente +
+ * salto de retirados que ya hace el servidor para decidir de quién es el
+ * turno, solo que aquí se repite varios pasos hacia delante para poder
+ * pintar la cola de quién viene después.
+ */
+function proximosTurnos(datos, cantidad) {
+  const { teamOrder, currentPick, totalPicks, retirados } = datos;
+  const retiradoSet = new Set(retirados ?? []);
+  const n = teamOrder.length;
+  if (n === 0) return [];
+
+  const resultado = [];
+  let pick = currentPick;
+  while (resultado.length < cantidad && pick < totalPicks) {
+    const ronda0 = Math.floor(pick / n);
+    const posEnRonda = pick % n;
+    const ordenRonda = ronda0 % 2 === 0 ? teamOrder : [...teamOrder].reverse();
+    const teamId = ordenRonda[posEnRonda];
+    if (!retiradoSet.has(teamId)) {
+      resultado.push({ teamId, pasos: resultado.length, pickIndex: pick });
+    }
+    pick += 1;
+  }
+  return resultado;
+}
+
 export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [datos, setDatos] = useState(inicial);
   const [wishlist, setWishlist] = useState(new Set(wishlistInicial));
@@ -166,6 +194,8 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const equipoDe = (teamId) => datos.equipos.find((e) => e.id === teamId);
   const equipoTurno = datos.turnoDeTeamId ? equipoDe(datos.turnoDeTeamId) : null;
   const ultimosPicks = [...datos.picks].reverse().slice(0, 8);
+  const proximos = proximosTurnos(datos, 24);
+  const miProximoPaso = proximos.find((p) => p.teamId === miTeamId)?.pasos ?? null;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -197,6 +227,11 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
               ¡Es tu turno!
             </span>
           )}
+          {!datos.esMiTurno && !datos.estoyRetirado && miProximoPaso != null && (
+            <span className="rounded-full border border-neon-green/50 px-2.5 py-1 text-[10px] font-semibold text-neon-green">
+              Te toca en {miProximoPaso} {miProximoPaso === 1 ? "turno" : "turnos"}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setPendienteRetiro(true)}
@@ -217,6 +252,45 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
           Has renunciado a fichar más jugadores — tus turnos se saltan automáticamente. Puedes
           deshacerlo cuando quieras con el botón de arriba.
         </p>
+      )}
+
+      {!datos.terminado && proximos.length > 0 && (
+        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {proximos.slice(0, 10).map((p) => {
+            const equipo = equipoDe(p.teamId);
+            const esAhora = p.pasos === 0;
+            const esYo = p.teamId === miTeamId;
+            return (
+              <div key={p.pickIndex} className="flex shrink-0 flex-col items-center gap-1">
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={equipo?.crest_url}
+                    alt=""
+                    title={equipo?.name}
+                    className={`h-11 w-11 rounded-full border-2 object-cover ${
+                      esAhora
+                        ? "animate-pulse border-neon-green"
+                        : esYo
+                          ? "border-neon-pink"
+                          : "border-border"
+                    }`}
+                  />
+                  <span
+                    className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
+                      esAhora ? "bg-neon-green text-black" : "bg-background-elevated text-muted"
+                    }`}
+                  >
+                    {p.pasos}
+                  </span>
+                </div>
+                <span className={`max-w-[3.5rem] truncate text-[9px] ${esYo ? "font-bold text-neon-pink" : "text-muted"}`}>
+                  {equipo?.name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {ultimosPicks.length > 0 && (
