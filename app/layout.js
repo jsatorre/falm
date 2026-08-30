@@ -15,6 +15,15 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "FALM",
   description: "Clasificación, jornada en directo y fichajes de la liga FALM.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "FALM",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0b0b12",
 };
 
 export default function RootLayout({ children }) {
