@@ -36,12 +36,23 @@ export default async function NavBar() {
 
         <div className="flex items-center gap-2">
           {equipo && (
-            <span className="hidden items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted md:flex">
+            <Link
+              href="/cuenta"
+              title="Mi cuenta"
+              className="hidden items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted transition hover:border-neon-green hover:text-neon-green md:flex"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={equipo.crest_url} alt="" className="h-4 w-4 rounded-full object-cover" />
               <span>{equipo.name}</span>
-            </span>
+            </Link>
           )}
+          <Link
+            href="/cuenta"
+            title="Mi cuenta / cambiar PIN"
+            className="rounded-full border border-border px-2.5 py-1.5 text-xs text-muted transition hover:border-neon-green hover:text-neon-green md:hidden"
+          >
+            🔑
+          </Link>
           <Link
             href="/admin"
             title="Admin"

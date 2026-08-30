@@ -9,15 +9,16 @@ import DraftAdminForm from "./DraftAdminForm";
 import DineroConfigForm from "./DineroConfigForm";
 import CalcularDeudasForm from "./CalcularDeudasForm";
 import AdminLogoutButton from "./AdminLogoutButton";
+import ResetearPinForm from "./ResetearPinForm";
 
 export default async function AdminPage() {
-  const [rounds, draft, { count: numEquipos }, liquidacionGuardada] = await Promise.all([
+  const [rounds, draft, { data: teams }, liquidacionGuardada] = await Promise.all([
     getCaraACaraRounds(),
     getEstadoDraft(),
-    supabase.from("teams").select("id", { count: "exact", head: true }),
+    supabase.from("teams").select("id, name, crest_url").order("name", { ascending: true }),
     getLiquidacionGuardada(),
   ]);
-  const numVueltas = jornadasPorVuelta(numEquipos ?? 0).length;
+  const numVueltas = jornadasPorVuelta((teams ?? []).length).length;
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
@@ -96,6 +97,18 @@ export default async function AdminPage() {
           publicar un cierre parcial).
         </p>
         <CalcularDeudasForm calculadaAtInicial={liquidacionGuardada?.calculadaAt ?? null} />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Resetear PIN de un equipo
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Para cuando a alguien se le olvida el PIN y no puede ni entrar a cambiárselo él mismo
+          (eso lo puede hacer solo desde su propia cuenta, en 🔑 / "Mi cuenta"). Genera uno nuevo al
+          azar y lo enseña una sola vez — el PIN antiguo deja de servir en el momento.
+        </p>
+        <ResetearPinForm teams={teams ?? []} />
       </section>
 
       <section>
