@@ -379,6 +379,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
           equipoDe={equipoDe}
           equipoTurno={equipoTurno}
           miProximoPaso={miProximoPaso}
+          proximoTeamId={proximos[1]?.teamId ?? null}
           misJugadores={misJugadores}
           miTeamId={miTeamId}
           retirando={retirando}
@@ -412,12 +413,9 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
  * esencial; al tocarlo se despliega el resto (cola de turnos, tu
  * plantilla, botón de retirarte).
  */
-function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugadores, miTeamId, retirando, onRetirar }) {
+function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, proximoTeamId, misJugadores, miTeamId, retirando, onRetirar }) {
   const [abierto, setAbierto] = useState(false);
   const miEquipo = equipoDe(miTeamId);
-  // Lista vertical: "hacia abajo" = recorre el orden del sorteo de arriba a
-  // abajo (ronda normal), "hacia arriba" = de abajo a arriba (ronda invertida).
-  const rondaHaciaAbajo = datos.ronda != null ? (datos.ronda - 1) % 2 === 0 : true;
 
   return (
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
@@ -454,19 +452,12 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugador
 
           {datos.teamOrder.length > 0 && (
             <div className="mt-3">
-              <p className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted">
-                Orden del draft
-                <span
-                  title={rondaHaciaAbajo ? "Esta ronda avanza hacia abajo" : "Esta ronda va al revés, hacia arriba (serpiente)"}
-                  className="text-sm font-bold text-neon-green"
-                >
-                  {rondaHaciaAbajo ? "↓" : "↑"}
-                </span>
-              </p>
+              <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">Orden del draft</p>
               <div className="flex flex-col gap-1">
                 {datos.teamOrder.map((teamId) => {
                   const equipo = equipoDe(teamId);
                   const esAhora = teamId === datos.turnoDeTeamId;
+                  const esSiguiente = !esAhora && teamId === proximoTeamId;
                   const esYo = teamId === miTeamId;
                   const retirado = (datos.retirados ?? []).includes(teamId);
                   return (
@@ -475,9 +466,11 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugador
                       className={`flex items-center gap-2 rounded-lg border px-2 py-1 ${
                         esAhora
                           ? "border-neon-green/60 bg-neon-green/10"
-                          : esYo
-                            ? "border-neon-pink/60 bg-neon-pink/5"
-                            : "border-transparent"
+                          : esSiguiente
+                            ? "border-neon-orange/60 bg-neon-orange/10"
+                            : esYo
+                              ? "border-neon-pink/60 bg-neon-pink/5"
+                              : "border-transparent"
                       } ${retirado ? "opacity-40" : ""}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -485,7 +478,13 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugador
                         src={equipo?.crest_url}
                         alt=""
                         className={`h-6 w-6 shrink-0 rounded-full border-2 object-cover ${
-                          esAhora ? "animate-pulse border-neon-green" : esYo ? "border-neon-pink" : "border-border"
+                          esAhora
+                            ? "animate-pulse border-neon-green"
+                            : esSiguiente
+                              ? "border-neon-orange"
+                              : esYo
+                                ? "border-neon-pink"
+                                : "border-border"
                         }`}
                       />
                       <span
@@ -497,6 +496,9 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, misJugador
                       </span>
                       {esAhora && (
                         <span className="text-[9px] font-bold uppercase tracking-wider text-neon-green">Ahora</span>
+                      )}
+                      {esSiguiente && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-neon-orange">Siguiente</span>
                       )}
                     </div>
                   );
