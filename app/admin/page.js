@@ -1,12 +1,23 @@
 import { getCaraACaraRounds } from "../lib/caraACaraRounds";
 import { getEstadoDraft } from "../lib/draftEngine";
+import { jornadasPorVuelta } from "../lib/money";
+import { getLiquidacionGuardada } from "../lib/dineroConfig";
+import { supabase } from "../lib/supabaseServer";
 import AplazarJornadaForm from "./AplazarJornadaForm";
 import FichajesDeadlineForm from "./FichajesDeadlineForm";
 import DraftAdminForm from "./DraftAdminForm";
+import DineroConfigForm from "./DineroConfigForm";
+import CalcularDeudasForm from "./CalcularDeudasForm";
 import AdminLogoutButton from "./AdminLogoutButton";
 
 export default async function AdminPage() {
-  const [rounds, draft] = await Promise.all([getCaraACaraRounds(), getEstadoDraft()]);
+  const [rounds, draft, { count: numEquipos }, liquidacionGuardada] = await Promise.all([
+    getCaraACaraRounds(),
+    getEstadoDraft(),
+    supabase.from("teams").select("id", { count: "exact", head: true }),
+    getLiquidacionGuardada(),
+  ]);
+  const numVueltas = jornadasPorVuelta(numEquipos ?? 0).length;
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
@@ -58,6 +69,33 @@ export default async function AdminPage() {
           currentPick={draft.currentPick}
           totalPicks={draft.totalPicks}
         />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Premios en metálico
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Cuota por equipo, importe de cada premio y quién participa en el bote — todo ajustable
+          aquí. El indicador de abajo del formulario te dice si lo repartido en premios encaja con
+          el bote real, para ir ajustando hasta que cuadre.
+        </p>
+        <DineroConfigForm numJornadas={rounds.length} numVueltas={numVueltas} />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Calcular deudas
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          El bote y el saldo de cada equipo se ven siempre en vivo en Premios, pero "quién debe a
+          quién" solo se publica cuando le das aquí — a mitad de temporada, la mayoría de premios
+          (jornadas futuras, la vuelta que falta, el campeón final...) todavía no tienen ganador,
+          así que un cálculo en vivo repartiría de forma un poco arbitraria entre equipos que en
+          realidad están igual. Pulsa esto cuando la Liga haya terminado (o cuando quieras
+          publicar un cierre parcial).
+        </p>
+        <CalcularDeudasForm calculadaAtInicial={liquidacionGuardada?.calculadaAt ?? null} />
       </section>
 
       <section>

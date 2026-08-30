@@ -30,22 +30,64 @@ const fila = () => ({
 });
 
 /**
+ * Para cada jornada de `fixturesAConsiderar`, quién(es) sacaron el máximo
+ * de puntos Biwenger esa semana y qué fracción de "jornada ganada" les
+ * toca — se reparte a partes iguales si hay empate (2 empatados, 0.5 cada
+ * uno; 3, un tercio...). La usan tanto la columna JG de la clasificación
+ * como el premio en metálico por jornada (ver app/lib/money.js) — misma
+ * regla en los dos sitios.
+ *
+ * @param {Array<{roundId, jornada, teamAId, teamBId}>} fixturesAConsiderar
+ * @param {Record<string, Record<string, number>>} results
+ * @returns {Map<number, Array<{teamId: string, parte: number}>>} jornada -> ganadores
+ */
+export function ganadoresPorJornada(fixturesAConsiderar, results) {
+  const jornadas = new Set(fixturesAConsiderar.map((f) => f.jornada));
+  const porJornada = new Map();
+
+  for (const jornada of jornadas) {
+    const fixturesDeJornada = fixturesAConsiderar.filter((f) => f.jornada === jornada);
+    let max = -Infinity;
+    const puntosPorEquipo = [];
+    for (const f of fixturesDeJornada) {
+      const resultadosJornada = results[f.roundId];
+      if (!resultadosJornada) continue;
+      for (const teamId of [f.teamAId, f.teamBId]) {
+        const pts = resultadosJornada[teamId];
+        if (pts == null) continue;
+        puntosPorEquipo.push({ teamId, pts });
+        if (pts > max) max = pts;
+      }
+    }
+    const empatados = puntosPorEquipo.filter((p) => p.pts === max);
+    if (empatados.length === 0) continue; // jornada sin ningún resultado todavía
+    const parte = 1 / empatados.length;
+    porJornada.set(jornada, empatados.map(({ teamId }) => ({ teamId, parte })));
+  }
+
+  return porJornada;
+}
+
+/**
  * Calcula la clasificación a partir de los emparejamientos fijos de la
- * temporada y los puntos Biwenger conseguidos cada jornada, hasta (e
- * incluyendo) `hastaJornada` si se indica — así la clasificación "a fecha
- * de la jornada N" es solo filtrar, no una tabla aparte que hay que ir
- * copiando cada semana.
+ * temporada y los puntos Biwenger conseguidos cada jornada, en el rango
+ * [`desdeJornada`, `hastaJornada`] (ambos opcionales e incluidos) — así la
+ * clasificación "a fecha de la jornada N" o "solo de esta vuelta" es solo
+ * filtrar, no una tabla aparte que hay que ir copiando cada semana.
  *
  * @param {Array<{id, name, crestUrl}>} teams
  * @param {Array<{roundId, jornada, teamAId, teamBId}>} fixtures
  * @param {Record<string, Record<string, number>>} results  roundId -> teamId -> puntos Biwenger
  * @param {number} [hastaJornada]
+ * @param {number} [desdeJornada]
  */
-export function calcularClasificacion(teams, fixtures, results, hastaJornada) {
+export function calcularClasificacion(teams, fixtures, results, hastaJornada, desdeJornada) {
   const tabla = new Map(teams.map((t) => [t.id, { ...fila(), team: t }]));
 
   const fixturesAConsiderar = fixtures.filter(
-    (f) => hastaJornada == null || f.jornada <= hastaJornada
+    (f) =>
+      (hastaJornada == null || f.jornada <= hastaJornada) &&
+      (desdeJornada == null || f.jornada >= desdeJornada)
   );
 
   // Primera pasada: puntos del enfrentamiento cara a cara.
@@ -62,24 +104,8 @@ export function calcularClasificacion(teams, fixtures, results, hastaJornada) {
 
   // Segunda pasada: jornada ganada (JG) = mayor puntuación Biwenger
   // individual de esa jornada entre los equipos que jugaron.
-  const jornadas = new Set(fixturesAConsiderar.map((f) => f.jornada));
-  for (const jornada of jornadas) {
-    const fixturesDeJornada = fixturesAConsiderar.filter((f) => f.jornada === jornada);
-    let max = -Infinity;
-    const puntosPorEquipo = [];
-    for (const f of fixturesDeJornada) {
-      const resultadosJornada = results[f.roundId];
-      if (!resultadosJornada) continue;
-      for (const teamId of [f.teamAId, f.teamBId]) {
-        const pts = resultadosJornada[teamId];
-        if (pts == null) continue;
-        puntosPorEquipo.push({ teamId, pts });
-        if (pts > max) max = pts;
-      }
-    }
-    const empatados = puntosPorEquipo.filter((p) => p.pts === max);
-    const parte = 1 / empatados.length; // empate a 2 -> 0.5 cada uno, a 3 -> 1/3, etc.
-    for (const { teamId } of empatados) {
+  for (const entradas of ganadoresPorJornada(fixturesAConsiderar, results).values()) {
+    for (const { teamId, parte } of entradas) {
       tabla.get(teamId).jg += parte;
     }
   }

@@ -11,6 +11,7 @@ const TABS = [
   { href: "/palmares", label: "Palmarés", icon: "🏅" },
   { href: "/equipo", label: "Equipo", icon: "👕" },
   { href: "/draft", label: "Draft", icon: "🎯" },
+  { href: "/premios", label: "Premios", icon: "💰" },
 ];
 
 export default async function NavBar() {

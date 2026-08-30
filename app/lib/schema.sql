@@ -16,7 +16,10 @@ create table if not exists teams (
     biwenger_user_id text,
     crest_url text,
     pin_hash text not null,
-    created_at timestamptz not null default now()
+    created_at timestamptz not null default now(),
+    -- si no participa en el bote, no pone la cuota ni puede ganar premios
+    -- (ver app/lib/money.js).
+    participa_dinero boolean not null default true
 );
 
 create table if not exists rounds (
@@ -89,7 +92,9 @@ create index if not exists fixtures_round_idx on fixtures(round_id);
 create index if not exists round_results_team_idx on round_results(team_id);
 
 -- Configuración general clave/valor (de momento solo la regla semanal de
--- fichajes: fichajes_dia_semana, fichajes_hora — ver app/lib/fichajesEngine.js).
+-- fichajes: fichajes_dia_semana, fichajes_hora — ver app/lib/fichajesEngine.js.
+-- También los premios en metálico (dinero_cuota, dinero_premio_*,
+-- dinero_sudden_*_team_id — ver app/lib/dineroConfig.js).
 create table if not exists app_settings (
     key text primary key,
     value text
