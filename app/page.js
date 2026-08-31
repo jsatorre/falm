@@ -8,12 +8,12 @@ const MEDALLAS = ["🥇", "🥈", "🥉"];
 // Colores propios (no los "neon" del resto de la app, que quedaban
 // deslavados a media opacidad) — un verde y un rojo distintos de verdad
 // para clara/ajustada, más un ámbar para el empate técnico.
-const ESTILO_POR_CATEGORIA = {
-  3: { backgroundColor: "#22c55e" }, // victoria clara
-  2: { backgroundColor: "#86efac" }, // victoria ajustada
-  1.5: { backgroundColor: "#fbbf24" }, // empate técnico
-  1: { backgroundColor: "#fca5a5" }, // derrota ajustada
-  0: { backgroundColor: "#ef4444" }, // derrota clara
+const COLOR_POR_CATEGORIA = {
+  3: "#22c55e", // victoria clara
+  2: "#86efac", // victoria ajustada
+  1.5: "#fbbf24", // empate técnico
+  1: "#fca5a5", // derrota ajustada
+  0: "#ef4444", // derrota clara
 };
 
 const NOMBRE_CATEGORIA = {
@@ -29,17 +29,18 @@ function Racha({ resultados }) {
     return <span className="text-xs text-muted">—</span>;
   }
   return (
-    <div className="flex items-center gap-0.5">
-      {resultados.map((r, i) => (
-        <span
-          key={i}
-          title={`${NOMBRE_CATEGORIA[r.categoria]} (${r.valor} pts Biwenger)`}
-          className="flex h-3.5 min-w-[1.1rem] items-center justify-center rounded px-0.5 text-[8px] font-bold text-black"
-          style={ESTILO_POR_CATEGORIA[r.categoria]}
-        >
-          {r.categoria}
-        </span>
-      ))}
+    <div className="flex items-center gap-1.5">
+      {resultados.map((r, i) => {
+        const color = COLOR_POR_CATEGORIA[r.categoria];
+        return (
+          <span
+            key={i}
+            title={`${NOMBRE_CATEGORIA[r.categoria]} (${r.valor} pts Biwenger)`}
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: color, boxShadow: `0 0 6px 0 ${color}99` }}
+          />
+        );
+      })}
     </div>
   );
 }
