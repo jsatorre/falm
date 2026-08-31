@@ -18,8 +18,12 @@ function asegurarConfig() {
  * borró datos del navegador...) Web Push devuelve 404/410 — esa
  * suscripción se borra sola, no hace falta que nadie la limpie a mano.
  *
+ * Devuelve el resultado real por dispositivo (no solo "lo he intentado")
+ * para poder diagnosticar sin depender de los logs de Vercel.
+ *
  * @param {string} teamId
  * @param {{ title: string, body: string, url?: string }} payload
+ * @returns {Promise<{ enviados: number, fallidos: Array<{ endpoint: string, error: string }> }>}
  */
 export async function enviarPushEquipo(teamId, payload) {
   asegurarConfig();
@@ -30,9 +34,12 @@ export async function enviarPushEquipo(teamId, payload) {
     .eq("team_id", teamId);
   if (error) {
     console.warn("No se han podido leer las suscripciones push:", error);
-    return;
+    return { enviados: 0, fallidos: [{ endpoint: "-", error: error.message }] };
   }
-  if (!subs || subs.length === 0) return;
+  if (!subs || subs.length === 0) return { enviados: 0, fallidos: [] };
+
+  const fallidos = [];
+  let enviados = 0;
 
   await Promise.all(
     subs.map(async (sub) => {
@@ -42,13 +49,21 @@ export async function enviarPushEquipo(teamId, payload) {
       };
       try {
         await webpush.sendNotification(subscription, JSON.stringify(payload));
+        enviados += 1;
       } catch (err) {
         if (err.statusCode === 404 || err.statusCode === 410) {
           await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          fallidos.push({ endpoint: sub.endpoint, error: `${err.statusCode} — suscripción caducada, borrada` });
         } else {
           console.warn(`No se ha podido enviar el push a ${sub.endpoint}:`, err.message ?? err);
+          fallidos.push({
+            endpoint: sub.endpoint,
+            error: `${err.statusCode ?? "?"} ${err.body ?? err.message ?? err}`,
+          });
         }
       }
     })
   );
+
+  return { enviados, fallidos };
 }

@@ -17,11 +17,11 @@ export async function POST(request) {
     return Response.json({ error: "Ese equipo no tiene notificaciones activadas en ningún dispositivo" }, { status: 409 });
   }
 
-  await enviarPushEquipo(teamId, {
+  const resultado = await enviarPushEquipo(teamId, {
     title: "FALM",
     body: "Notificación de prueba — si ves esto, funciona.",
     url: "/",
   });
 
-  return Response.json({ ok: true, dispositivos: count });
+  return Response.json({ ok: true, dispositivos: count, ...resultado });
 }

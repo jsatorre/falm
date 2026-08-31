@@ -22,7 +22,12 @@ export default function PushTestForm({ teams }) {
         setError(`${team.name}: ${data.error ?? "no se ha podido enviar"}`);
         return;
       }
-      setResultado(`Enviada a ${team.name} (${data.dispositivos} dispositivo${data.dispositivos === 1 ? "" : "s"})`);
+      if (data.fallidos?.length > 0) {
+        setError(`${team.name}: ${data.fallidos.map((f) => f.error).join(" · ")}`);
+      }
+      setResultado(
+        `${team.name}: ${data.enviados} de ${data.dispositivos} dispositivo${data.dispositivos === 1 ? "" : "s"} recibió el aviso`
+      );
     } finally {
       setEnviandoTeamId(null);
     }
