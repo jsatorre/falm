@@ -3,6 +3,7 @@ import Link from "next/link";
 import { supabase } from "../lib/supabaseServer";
 import LogoutButton from "./LogoutButton";
 import Logo from "./Logo";
+import NavLoadingHint from "./NavLoadingHint";
 
 const TABS = [
   { href: "/", label: "Clasificación", icon: "🏆" },
@@ -44,6 +45,7 @@ export default async function NavBar() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={equipo.crest_url} alt="" className="h-4 w-4 rounded-full object-cover" />
               <span>{equipo.name}</span>
+              <NavLoadingHint />
             </Link>
           )}
           <Link
@@ -52,6 +54,7 @@ export default async function NavBar() {
             className="rounded-full border border-border px-2.5 py-1.5 text-xs text-muted transition hover:border-neon-green hover:text-neon-green md:hidden"
           >
             🔑
+            <NavLoadingHint />
           </Link>
           <Link
             href="/admin"
@@ -59,6 +62,7 @@ export default async function NavBar() {
             className="rounded-full border border-border px-2.5 py-1.5 text-xs text-muted transition hover:border-neon-purple hover:text-neon-purple"
           >
             ⚙️
+            <NavLoadingHint />
           </Link>
           <LogoutButton />
         </div>
@@ -73,6 +77,7 @@ export default async function NavBar() {
           >
             <span className="mr-1">{tab.icon}</span>
             <span>{tab.label}</span>
+            <NavLoadingHint />
           </Link>
         ))}
       </nav>

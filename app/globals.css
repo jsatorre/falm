@@ -107,3 +107,33 @@ button:disabled {
   pointer-events: none;
   z-index: 50;
 }
+
+/* Punto que aparece junto a un enlace del menú mientras la navegación
+   está en curso (ver NavLoadingHint.js) — con retraso de 100ms para no
+   parpadear en navegaciones que ya son instantáneas. */
+.link-hint {
+  display: inline-block;
+  width: 0.35em;
+  height: 0.35em;
+  margin-left: 0.4em;
+  border-radius: 9999px;
+  background: var(--neon-green);
+  opacity: 0;
+  visibility: hidden;
+}
+
+.link-hint.is-pending {
+  visibility: visible;
+  animation-name: link-hint-fade-in, pulse-live;
+  animation-duration: 200ms, 1s;
+  animation-delay: 100ms, 100ms;
+  animation-timing-function: ease, ease-in-out;
+  animation-iteration-count: 1, infinite;
+  animation-fill-mode: forwards, none;
+}
+
+@keyframes link-hint-fade-in {
+  to {
+    opacity: 1;
+  }
+}
