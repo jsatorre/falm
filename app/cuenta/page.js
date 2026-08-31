@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { supabase } from "../lib/supabaseServer";
 import CambiarPinForm from "./CambiarPinForm";
+import NotificacionesForm from "./NotificacionesForm";
 
 export default async function CuentaPage() {
   const headerList = await headers();
@@ -21,6 +22,11 @@ export default async function CuentaPage() {
           <img src={equipo.crest_url} alt="" className="h-7 w-7 rounded-full object-cover" />
         )}
         <h1 className="text-2xl font-black tracking-tight">{equipo?.name ?? "Tu equipo"}</h1>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-border bg-background-elevated p-5">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">Notificaciones</h2>
+        <NotificacionesForm />
       </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-background-elevated p-5">

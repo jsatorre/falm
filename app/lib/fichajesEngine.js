@@ -2,6 +2,7 @@ import { supabase } from "./supabaseServer";
 import { calcularClasificacion } from "./scoring";
 import { priorizarEquipos, asignarFichajes } from "./fichajes";
 import { getCaraACaraRounds } from "./caraACaraRounds";
+import { enviarPushEquipo } from "./push";
 
 /**
  * Si ya pasó la hora tope de una jornada de fichajes, calcula (la primera
@@ -85,6 +86,27 @@ export async function publicarFichajesSiToca(ronda) {
       .from("fichaje_assignments")
       .insert(asignaciones.map((a) => ({ round_id: ronda.id, team_id: a.teamId, player: a.player })));
     if (insertError) throw insertError;
+  }
+
+  // Aviso push a todos los equipos — esto solo se ejecuta la primera vez
+  // que se calculan los fichajes de esta jornada (la siguiente vez que se
+  // llame, el early return de arriba ya no vuelve a pasar por aquí), así
+  // que nunca se manda dos veces el mismo aviso. Un fallo al notificar no
+  // debe tirar abajo el cálculo de fichajes en sí.
+  try {
+    const jugadorPorEquipo = new Map(asignaciones.map((a) => [a.teamId, a.player]));
+    await Promise.all(
+      teams.map((t) => {
+        const jugador = jugadorPorEquipo.get(t.id);
+        return enviarPushEquipo(t.id, {
+          title: "Fichajes resueltos",
+          body: jugador ? `Te has llevado a ${jugador}` : "No has fichado a nadie esta jornada",
+          url: "/fichajes",
+        });
+      })
+    );
+  } catch (err) {
+    console.warn("No se han podido mandar los avisos push de fichajes:", err);
   }
 
   return asignaciones.map((a) => ({ team_id: a.teamId, player: a.player }));

@@ -10,6 +10,7 @@ import DineroConfigForm from "./DineroConfigForm";
 import CalcularDeudasForm from "./CalcularDeudasForm";
 import AdminLogoutButton from "./AdminLogoutButton";
 import ResetearPinForm from "./ResetearPinForm";
+import PushTestForm from "./PushTestForm";
 
 export default async function AdminPage() {
   const [rounds, draft, { data: teams }, liquidacionGuardada] = await Promise.all([
@@ -109,6 +110,19 @@ export default async function AdminPage() {
           azar y lo enseña una sola vez — el PIN antiguo deja de servir en el momento.
         </p>
         <ResetearPinForm teams={teams ?? []} />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Probar notificaciones
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Manda un aviso de prueba a todos los dispositivos donde ese equipo tenga las
+          notificaciones activadas (🔑 / "Mi cuenta") — para comprobar que llegan de verdad al
+          móvil. De momento solo se avisa automáticamente cuando se resuelven los fichajes de la
+          jornada.
+        </p>
+        <PushTestForm teams={teams ?? []} />
       </section>
 
       <section>

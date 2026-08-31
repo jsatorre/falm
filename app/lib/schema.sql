@@ -139,3 +139,16 @@ create table if not exists draft_wishlist (
     created_at timestamptz not null default now(),
     primary key (team_id, player_id)
 );
+
+-- Suscripciones de notificaciones push (Web Push), una fila por
+-- dispositivo/navegador — un equipo puede tener varias si activa las
+-- notificaciones desde el móvil y el ordenador. Ver app/lib/push.js.
+create table if not exists push_subscriptions (
+    id uuid primary key default gen_random_uuid(),
+    team_id uuid not null references teams(id) on delete cascade,
+    endpoint text not null unique,
+    p256dh text not null,
+    auth text not null,
+    created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_team_idx on push_subscriptions(team_id);
