@@ -91,6 +91,13 @@ export default async function ClasificacionPage() {
     .map((f) => f.jornada);
   const ultimaJornadaConDatos = jornadasConResultado.length > 0 ? Math.max(...jornadasConResultado) : 0;
 
+  // La jornada con los datos más recientes puede seguir en juego (o incluso
+  // "pending" si solo ha terminado algún partido aplazado de una jornada
+  // anterior) — en ese caso la clasificación es provisional: puede haber
+  // partidos de esa jornada que todavía no han terminado y que la moverán.
+  const rondaUltimaJornada = rounds.find((r) => r.jornadaCaraACara === ultimaJornadaConDatos);
+  const esProvisional = ultimaJornadaConDatos > 0 && rondaUltimaJornada?.status !== "finished";
+
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
@@ -98,11 +105,21 @@ export default async function ClasificacionPage() {
           <p className="text-xs font-medium uppercase tracking-[0.3em] text-neon-purple">
             Clasificación
           </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+          <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-black tracking-tight sm:text-3xl">
             {ultimaJornadaConDatos > 0
               ? `Después de la jornada ${ultimaJornadaConDatos}`
               : "Todavía no hay resultados"}
+            {esProvisional && (
+              <span className="pulse-live rounded-full border border-neon-orange/40 bg-neon-orange/10 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-neon-orange">
+                Provisional
+              </span>
+            )}
           </h1>
+          {esProvisional && (
+            <p className="mt-1 text-xs text-neon-orange">
+              La jornada {ultimaJornadaConDatos} todavía está en juego — puede haber partidos sin terminar que muevan la clasificación.
+            </p>
+          )}
           {ultimaSincronizacion && (
             <p className="mt-1 text-xs text-muted">
               Datos actualizados el{" "}
