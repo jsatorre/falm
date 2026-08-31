@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseServer";
 import { getAllTeamsRoundPoints, getSeasonRounds } from "./integrations/biwenger";
+import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
 
 /**
  * El estado de cada jornada (pendiente/cerrada) viene del calendario
@@ -97,16 +98,34 @@ export async function syncBiwengerResults() {
 
 // Cache en memoria del proceso, compartida por /api/live y por la carga
 // inicial de la página "en directo". Cada sync son 12 llamadas a Biwenger
-// (una por equipo) en paralelo, así que este minuto de margen es también
-// el "cooldown" compartido del botón de actualizar en el cliente: da igual
+// (una por equipo) en paralelo, así que este margen es también el
+// "cooldown" compartido del botón de actualizar en el cliente: da igual
 // quién lo pulse o cuántos amigos tengan la pantalla abierta a la vez, en
-// esta ventana de 60s solo se dispara una sincronización real.
-const CACHE_MS = 60000;
+// esa ventana solo se dispara una sincronización real.
+//
+// El margen no es fijo: si la jornada en directo está de verdad en juego
+// ("live"), 60s para que se note ágil; si ya ha terminado (o todavía no ha
+// empezado) los puntos no van a cambiar de un minuto para otro, así que no
+// tiene sentido seguir preguntándole a Biwenger cada vez que alguien entra
+// — con 20 min de sobra (el auto-refresco del cliente es cada 15 min).
+const CACHE_MS_LIVE = 60000;
+const CACHE_MS_INACTIVA = 20 * 60 * 1000;
 let cache = null; // { ts, promise }
 
-export function syncBiwengerResultsCached() {
+async function margenActual() {
+  try {
+    const rounds = await getCaraACaraRounds();
+    const ronda = elegirRondaEnDirecto(rounds);
+    return ronda?.status === "live" ? CACHE_MS_LIVE : CACHE_MS_INACTIVA;
+  } catch {
+    return CACHE_MS_LIVE; // si esta comprobación falla, mejor pecar de refrescar de más que de menos
+  }
+}
+
+export async function syncBiwengerResultsCached() {
   const ahora = Date.now();
-  if (!cache || ahora - cache.ts > CACHE_MS) {
+  const margen = await margenActual();
+  if (!cache || ahora - cache.ts > margen) {
     cache = { ts: ahora, promise: syncBiwengerResults() };
   }
   return cache.promise;

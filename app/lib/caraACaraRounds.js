@@ -27,3 +27,14 @@ export async function getCaraACaraRounds() {
 
   return rounds.map((r, i) => ({ ...r, jornadaCaraACara: i + 1 }));
 }
+
+/**
+ * De la lista de getCaraACaraRounds(), cuál es "la jornada en directo": la
+ * primera que no esté ya cerrada, o la última si la temporada ha
+ * terminado sus 22 jornadas. Mismo criterio que usa getRondaEnDirecto — se
+ * saca aparte porque también lo necesita sync.js para decidir si merece
+ * la pena volver a preguntarle a Biwenger (ver syncBiwengerResultsCached).
+ */
+export function elegirRondaEnDirecto(rounds) {
+  return rounds.find((r) => r.status !== "finished") ?? rounds.at(-1) ?? null;
+}

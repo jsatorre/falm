@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseServer";
-import { getCaraACaraRounds } from "./caraACaraRounds";
+import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
 import {
   calcularClasificacion,
   elegirPartidoDestacado,
@@ -17,7 +17,7 @@ import {
  */
 export async function getRondaEnDirecto() {
   const rounds = await getCaraACaraRounds();
-  const ronda = rounds.find((r) => r.status !== "finished") ?? rounds.at(-1) ?? null;
+  const ronda = elegirRondaEnDirecto(rounds);
   if (!ronda) return { jornada: null, fixtures: [] };
 
   const [
