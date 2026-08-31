@@ -16,7 +16,7 @@ for (const line of envFile.split(/\r?\n/)) {
   process.env[line.slice(0, i)] = process.env[line.slice(0, i)] ?? line.slice(i + 1);
 }
 
-const { getLeagueStandings, getSeasonRounds, iconUrl } = await import("../app/lib/integrations/biwenger.js");
+const { getLeagueStandings, getSeasonData, iconUrl } = await import("../app/lib/integrations/biwenger.js");
 const { generarCalendarioDobleVuelta } = await import("../app/lib/scoring.js");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
@@ -30,7 +30,7 @@ async function main() {
   const standings = await getLeagueStandings();
 
   console.log("Leyendo jornadas de la temporada...");
-  const rounds = await getSeasonRounds();
+  const { rounds } = await getSeasonData();
 
   console.log("Creando temporada...");
   const { data: season, error: seasonError } = await supabase

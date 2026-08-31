@@ -1,6 +1,5 @@
 import { supabase } from "./supabaseServer";
-import { getAllTeamsRoundPoints, getSeasonRounds } from "./integrations/biwenger";
-import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
+import { getAllTeamsRoundPoints, getSeasonData } from "./integrations/biwenger";
 
 /**
  * El estado de cada jornada (pendiente/cerrada) viene del calendario
@@ -18,11 +17,10 @@ const ESTADO_BIWENGER_A_NUESTRO = {
   finished: "finished",
 };
 
-async function syncEstadosDeJornada() {
-  const [seasonRounds, { data: rounds, error }] = await Promise.all([
-    getSeasonRounds(),
-    supabase.from("rounds").select("id, biwenger_round_id, status"),
-  ]);
+async function syncEstadosDeJornada(seasonRounds) {
+  const { data: rounds, error } = await supabase
+    .from("rounds")
+    .select("id, biwenger_round_id, status");
   if (error) throw error;
 
   const estadoPorBiwengerId = new Map(seasonRounds.map((r) => [String(r.id), r.status]));
@@ -47,13 +45,23 @@ async function syncEstadosDeJornada() {
 
 /**
  * Trae de Biwenger los puntos de TODAS las jornadas para TODOS los
- * equipos (12 llamadas en paralelo, cada una ya trae el histórico
- * completo de esa "manager") y los vuelca en `round_results`, y de paso
- * refresca qué jornadas ha cerrado ya Biwenger. Se puede llamar tan a
- * menudo como haga falta — es upsert puro, idempotente.
+ * equipos (12 llamadas en paralelo a tu cuenta personal) y los vuelca en
+ * `round_results`, y de paso refresca qué jornadas ha cerrado ya Biwenger.
+ *
+ * El estado de las jornadas (pending/live/finished) se refresca SIEMPRE —
+ * es una única llamada pública, gratis, no toca tu cuenta. Pero las 12
+ * llamadas caras (los puntos de cada equipo) solo se hacen si Biwenger dice
+ * que hay algún partido en juego ahora mismo (`activeEvents`): fuera de esas
+ * horas no hay puntos nuevos que traer, así que no tiene sentido gastar tu
+ * cuota. Como la comprobación gratuita se hace en cada llamada, en cuanto
+ * arranca un partido se detecta de inmediato — no hay ninguna ventana en la
+ * que nos podamos "perder" el inicio de una jornada.
  */
 export async function syncBiwengerResults() {
-  await syncEstadosDeJornada();
+  const { rounds: seasonRounds, hayPartidosEnJuego } = await getSeasonData();
+  await syncEstadosDeJornada(seasonRounds);
+
+  if (!hayPartidosEnJuego) return { synced: 0, motivo: "sin partidos en juego" };
 
   const { data: teams, error: teamsError } = await supabase
     .from("teams")
@@ -97,35 +105,18 @@ export async function syncBiwengerResults() {
 }
 
 // Cache en memoria del proceso, compartida por /api/live y por la carga
-// inicial de la página "en directo". Cada sync son 12 llamadas a Biwenger
-// (una por equipo) en paralelo, así que este margen es también el
-// "cooldown" compartido del botón de actualizar en el cliente: da igual
-// quién lo pulse o cuántos amigos tengan la pantalla abierta a la vez, en
-// esa ventana solo se dispara una sincronización real.
-//
-// El margen no es fijo: si la jornada en directo está de verdad en juego
-// ("live"), 60s para que se note ágil; si ya ha terminado (o todavía no ha
-// empezado) los puntos no van a cambiar de un minuto para otro, así que no
-// tiene sentido seguir preguntándole a Biwenger cada vez que alguien entra
-// — con 20 min de sobra (el auto-refresco del cliente es cada 15 min).
-const CACHE_MS_LIVE = 60000;
-const CACHE_MS_INACTIVA = 20 * 60 * 1000;
+// inicial de la página "en directo". Margen fijo y corto: da igual cuántos
+// amigos tengan la pantalla abierta a la vez, en esa ventana solo se
+// dispara una llamada real — y esa llamada, internamente, ya decide sola
+// (vía activeEvents, gratis) si merece la pena gastar las 12 peticiones
+// caras o no (ver syncBiwengerResults). Por eso no hace falta alargar este
+// margen cuando no hay nada en juego: la parte cara ya se salta sola.
+const CACHE_MS = 60000;
 let cache = null; // { ts, promise }
-
-async function margenActual() {
-  try {
-    const rounds = await getCaraACaraRounds();
-    const ronda = elegirRondaEnDirecto(rounds);
-    return ronda?.status === "live" ? CACHE_MS_LIVE : CACHE_MS_INACTIVA;
-  } catch {
-    return CACHE_MS_LIVE; // si esta comprobación falla, mejor pecar de refrescar de más que de menos
-  }
-}
 
 export async function syncBiwengerResultsCached() {
   const ahora = Date.now();
-  const margen = await margenActual();
-  if (!cache || ahora - cache.ts > margen) {
+  if (!cache || ahora - cache.ts > CACHE_MS) {
     cache = { ts: ahora, promise: syncBiwengerResults() };
   }
   return cache.promise;

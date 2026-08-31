@@ -154,14 +154,19 @@ export async function getFichaJugador(playerId) {
 }
 
 /**
- * Jornadas de la temporada actual de La Liga, en orden, sin las
- * "aplazadas" (partidos que se reprograman fuera de su jornada original —
- * no cuentan como una jornada propia a efectos de nuestro calendario).
- * Endpoint público, sin necesidad de login.
+ * Jornadas de la temporada actual de La Liga (sin las "aplazadas", que no
+ * cuentan como jornada propia) y si hay algún partido en juego ahora mismo
+ * (activeEvents no vacío) — todo en una sola llamada al endpoint público de
+ * Biwenger (sin login, no consume tu cuenta personal). No hace falta saber
+ * de antemano el calendario ni distinguir horas/días: fuera de las horas
+ * con partidos, activeEvents simplemente viene vacío por sí solo.
  */
-export async function getSeasonRounds() {
+export async function getSeasonData() {
   const res = await fetch("https://cf.biwenger.com/api/v2/competitions/la-liga/data?lang=es");
   if (!res.ok) throw new Error(`Biwenger competition data -> ${res.status}`);
   const { data } = await res.json();
-  return data.season.rounds.filter((r) => !r.part);
+  return {
+    rounds: data.season.rounds.filter((r) => !r.part),
+    hayPartidosEnJuego: (data.activeEvents ?? []).length > 0,
+  };
 }
