@@ -40,6 +40,88 @@ function proximosTurnos(datos, cantidad) {
   return resultado;
 }
 
+/**
+ * Picks agrupados por equipo, jugadores ordenados alfabéticamente dentro
+ * de cada uno — para el resumen final que sirve de chuleta al asignar
+ * manualmente cada jugador a su equipo en el propio Biwenger (no hay API
+ * para eso, es un paso manual del admin).
+ */
+function picksPorEquipo(datos) {
+  const porEquipo = new Map(); // teamId -> jugadores[]
+  for (const p of datos.picks) {
+    if (!porEquipo.has(p.teamId)) porEquipo.set(p.teamId, []);
+    porEquipo.get(p.teamId).push({ nombre: p.playerName, club: p.playerClub });
+  }
+  for (const jugadores of porEquipo.values()) {
+    jugadores.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }
+  return datos.equipos
+    .map((e) => ({ equipo: e, jugadores: porEquipo.get(e.id) ?? [] }))
+    .sort((a, b) => b.jugadores.length - a.jugadores.length);
+}
+
+function ResumenDraft({ datos }) {
+  const [copiadoTeamId, setCopiadoTeamId] = useState(null);
+  const grupos = useMemo(() => picksPorEquipo(datos), [datos]);
+
+  async function copiar(teamId, jugadores) {
+    const texto = jugadores.map((j) => j.nombre).join("\n");
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiadoTeamId(teamId);
+      setTimeout(() => setCopiadoTeamId((actual) => (actual === teamId ? null : actual)), 1500);
+    } catch {
+      // clipboard no disponible (p.ej. http sin permisos) — sin drama, el
+      // admin puede seleccionar y copiar el texto a mano.
+    }
+  }
+
+  return (
+    <div className="mt-6">
+      <h2 className="text-sm font-bold uppercase tracking-wider text-neon-purple">
+        Resumen — jugadores fichados por equipo
+      </h2>
+      <p className="mt-1 text-xs text-muted">
+        Para asignarlos a mano en Biwenger. &quot;Copiar lista&quot; copia los nombres, uno por línea.
+      </p>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {grupos.map(({ equipo, jugadores }) => (
+          <div key={equipo.id} className="rounded-2xl border border-border">
+            <div className="flex items-center justify-between gap-2 border-b border-border bg-background-elevated px-3 py-2">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={equipo.crest_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+                {equipo.name}
+                <span className="font-normal normal-case text-muted">({jugadores.length})</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => copiar(equipo.id, jugadores)}
+                disabled={jugadores.length === 0}
+                className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] text-muted hover:border-neon-green hover:text-neon-green disabled:opacity-40"
+              >
+                {copiadoTeamId === equipo.id ? "¡Copiado!" : "Copiar lista"}
+              </button>
+            </div>
+            {jugadores.length === 0 ? (
+              <p className="px-3 py-3 text-xs text-muted">Sin jugadores.</p>
+            ) : (
+              <ul className="divide-y divide-border/60 text-sm">
+                {jugadores.map((j, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                    <span>{j.nombre}</span>
+                    <span className="shrink-0 text-xs text-muted">{j.club}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [datos, setDatos] = useState(inicial);
   const [wishlist, setWishlist] = useState(new Set(wishlistInicial));
@@ -204,9 +286,12 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
       <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Tablero en vivo</h1>
 
       {datos.terminado && (
-        <p className="mt-4 rounded-xl border border-neon-green/40 bg-neon-green/10 px-4 py-3 text-sm text-neon-green">
-          Draft terminado — {datos.totalPicks} jugadores fichados entre los {datos.equipos.length} equipos.
-        </p>
+        <>
+          <p className="mt-4 rounded-xl border border-neon-green/40 bg-neon-green/10 px-4 py-3 text-sm text-neon-green">
+            Draft terminado — {datos.totalPicks} jugadores fichados entre los {datos.equipos.length} equipos.
+          </p>
+          <ResumenDraft datos={datos} />
+        </>
       )}
 
       {ultimosPicks.length > 0 && (
