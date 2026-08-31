@@ -49,8 +49,17 @@ export default async function ClasificacionPage() {
     getCaraACaraRounds(),
     supabase.from("teams").select("id, name, crest_url"),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
-    supabase.from("round_results").select("round_id, team_id, biwenger_points"),
+    supabase.from("round_results").select("round_id, team_id, biwenger_points, synced_at"),
   ]);
+
+  // La fecha del último dato guardado (no de "ahora") — para que se sepa
+  // si esto está fresco o lleva un rato sin que nadie abra En directo (ver
+  // esa sección: solo se sincroniza cuando alguien la mira, no en segundo
+  // plano).
+  const ultimaSincronizacion = resultsRaw.reduce(
+    (max, r) => (r.synced_at && (!max || r.synced_at > max) ? r.synced_at : max),
+    null
+  );
 
   const jornadaCaraACaraPorRoundId = new Map(rounds.map((r) => [r.id, r.jornadaCaraACara]));
 
@@ -94,6 +103,18 @@ export default async function ClasificacionPage() {
               ? `Después de la jornada ${ultimaJornadaConDatos}`
               : "Todavía no hay resultados"}
           </h1>
+          {ultimaSincronizacion && (
+            <p className="mt-1 text-xs text-muted">
+              Datos actualizados el{" "}
+              {new Date(ultimaSincronizacion).toLocaleString("es-ES", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}{" "}
+              (se refresca al abrir En directo)
+            </p>
+          )}
         </div>
         <CelebrateButton />
       </div>
