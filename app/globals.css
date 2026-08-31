@@ -35,6 +35,17 @@ body {
   min-height: 100%;
 }
 
+/* El preflight de Tailwind quita el cursor de mano de los <button> (a
+   diferencia de los <a>) — sin esto, ningún botón de la app parece
+   clicable al pasar el ratón por encima. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 .glow-purple {
   box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 24px rgba(168, 85, 247, 0.25);
 }
