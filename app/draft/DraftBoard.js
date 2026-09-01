@@ -427,21 +427,21 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         </p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-1">
-        <ChipFiltro compacto activo={vista === "lista"} onClick={() => setVista("lista")}>
-          📋
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <ChipFiltro activo={vista === "lista"} onClick={() => setVista("lista")}>
+          📋 Lista
         </ChipFiltro>
-        <ChipFiltro compacto activo={vista === "club"} onClick={() => setVista("club")}>
-          🏟️
+        <ChipFiltro activo={vista === "club"} onClick={() => setVista("club")}>
+          🏟️ Por club
         </ChipFiltro>
 
-        <span className="mx-0.5 h-4 w-px bg-border" />
+        <span className="mx-1 h-5 w-px bg-border" />
 
-        <ChipFiltro compacto activo={posicion === "TODOS"} onClick={() => setPosicion("TODOS")}>
+        <ChipFiltro activo={posicion === "TODOS"} onClick={() => setPosicion("TODOS")}>
           Todos
         </ChipFiltro>
         {POSICIONES.map((p) => (
-          <ChipFiltro compacto key={p.codigo} activo={posicion === p.codigo} onClick={() => setPosicion(p.codigo)}>
+          <ChipFiltro key={p.codigo} activo={posicion === p.codigo} onClick={() => setPosicion(p.codigo)}>
             {p.codigo}
           </ChipFiltro>
         ))}
@@ -449,7 +449,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         <select
           value={club}
           onChange={(e) => setClub(e.target.value)}
-          className="w-20 shrink-0 rounded-lg border border-border bg-background px-1.5 py-1 text-[11px] outline-none focus:border-neon-green"
+          className="w-28 shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-neon-green"
         >
           <option value="TODOS">Club</option>
           {clubes.map((c) => (
@@ -460,20 +460,20 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         <input
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar..."
-          className="w-20 shrink-0 rounded-lg border border-border bg-background px-1.5 py-1 text-[11px] outline-none focus:border-neon-green"
+          placeholder="Buscar jugador..."
+          className="w-32 shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-neon-green"
         />
 
-        <span className="mx-0.5 h-4 w-px bg-border" />
+        <span className="mx-1 h-5 w-px bg-border" />
 
-        <ChipFiltro compacto activo={soloLibres} onClick={() => setSoloLibres((v) => !v)}>
-          Libres
+        <ChipFiltro activo={soloLibres} onClick={() => setSoloLibres((v) => !v)}>
+          Solo libres
         </ChipFiltro>
-        <ChipFiltro compacto activo={soloWishlist} onClick={() => setSoloWishlist((v) => !v)}>
-          ★
+        <ChipFiltro activo={soloWishlist} onClick={() => setSoloWishlist((v) => !v)}>
+          ★ Wishlist
         </ChipFiltro>
-        <ChipFiltro compacto activo={soloMiEquipo} onClick={alternarMiEquipo}>
-          👕 {misJugadores.length}
+        <ChipFiltro activo={soloMiEquipo} onClick={alternarMiEquipo}>
+          👕 Mi equipo ({misJugadores.length})
         </ChipFiltro>
       </div>
 
