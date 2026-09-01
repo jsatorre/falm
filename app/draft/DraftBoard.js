@@ -98,10 +98,11 @@ function agruparPorClub(jugadores) {
  * jugadores agrupados por posición dentro de cada una y etiquetados por
  * color. Los ya fichados (por cualquiera) se ven tachados; los tuyos,
  * además, en verde y sin tachar (siguen "cogidos" pero por ti); los de tu
- * wishlist llevan estrella. Los libres se pueden fichar tocándolos
- * directamente, igual que en la lista (solo si es tu turno).
+ * wishlist llevan estrella, pulsable aquí mismo para añadir/quitar. Los
+ * libres se pueden fichar tocando el nombre, igual que en la lista (solo
+ * si es tu turno).
  */
-function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onFichar }) {
+function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onFichar, onAlternarWishlist }) {
   const columnas = useMemo(() => agruparPorClub(jugadores), [jugadores]);
 
   if (columnas.length === 0) {
@@ -125,42 +126,47 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
                   {grupo.jugadores.map((j) => {
                     const esMio = j.ocupado && j.teamId === miTeamId;
                     const puedeFichar = !j.ocupado && !datos.terminado;
-                    const estrella = wishlist.has(j.id) && <span className="mr-0.5 text-amber-400">★</span>;
+                    const enWishlist = wishlist.has(j.id);
 
-                    if (puedeFichar) {
-                      return (
-                        <button
-                          key={j.id}
-                          type="button"
-                          onClick={() => onFichar(j)}
-                          disabled={!datos.esMiTurno || ficharEnCurso === j.id}
-                          title={datos.esMiTurno ? "Fichar" : "Solo puede fichar quien tenga el turno"}
-                          className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] leading-tight text-foreground transition hover:bg-white/10 disabled:hover:bg-transparent"
-                        >
-                          {estrella}
-                          {ficharEnCurso === j.id ? "…" : j.nombre}
-                        </button>
-                      );
-                    }
                     return (
-                      <span
-                        key={j.id}
-                        title={
-                          j.ocupado
-                            ? `${j.teamName} ${j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}`
-                            : j.posicionCodigo
-                        }
-                        className={`block w-full truncate rounded px-1.5 py-1 text-[11px] leading-tight ${
-                          esMio
-                            ? "font-bold text-neon-green"
-                            : j.ocupado
-                              ? "text-muted/50 line-through"
-                              : "text-foreground"
-                        }`}
-                      >
-                        {estrella}
-                        {j.nombre}
-                      </span>
+                      <div key={j.id} className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => onAlternarWishlist(j.id)}
+                          title="Añadir/quitar de mi wishlist"
+                          className={`shrink-0 text-[10px] leading-none ${enWishlist ? "text-amber-400" : "text-muted/40 hover:text-muted"}`}
+                        >
+                          {enWishlist ? "★" : "☆"}
+                        </button>
+                        {puedeFichar ? (
+                          <button
+                            type="button"
+                            onClick={() => onFichar(j)}
+                            disabled={!datos.esMiTurno || ficharEnCurso === j.id}
+                            title={datos.esMiTurno ? "Fichar" : "Solo puede fichar quien tenga el turno"}
+                            className="block min-w-0 flex-1 truncate rounded px-1 py-1 text-left text-[11px] leading-tight text-foreground transition hover:bg-white/10 disabled:hover:bg-transparent"
+                          >
+                            {ficharEnCurso === j.id ? "…" : j.nombre}
+                          </button>
+                        ) : (
+                          <span
+                            title={
+                              j.ocupado
+                                ? `${j.teamName} ${j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}`
+                                : j.posicionCodigo
+                            }
+                            className={`block min-w-0 flex-1 truncate rounded px-1 py-1 text-[11px] leading-tight ${
+                              esMio
+                                ? "font-bold text-neon-green"
+                                : j.ocupado
+                                  ? "text-muted/50 line-through"
+                                  : "text-foreground"
+                            }`}
+                          >
+                            {j.nombre}
+                          </span>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -486,6 +492,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
             datos={datos}
             ficharEnCurso={ficharEnCurso}
             onFichar={setPendienteFichar}
+            onAlternarWishlist={alternarWishlist}
           />
         </div>
       )}
