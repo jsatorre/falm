@@ -8,8 +8,8 @@ export default function manifest() {
     background_color: "#0b0b12",
     theme_color: "#0b0b12",
     icons: [
-      { src: "/icon-192", sizes: "192x192", type: "image/png" },
-      { src: "/icon-512", sizes: "512x512", type: "image/png" },
+      { src: "/icon-192", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+      { src: "/icon-512", sizes: "512x512", type: "image/png", purpose: "any maskable" },
     ],
   };
 }
