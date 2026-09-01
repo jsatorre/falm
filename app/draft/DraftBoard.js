@@ -109,11 +109,11 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border">
-      <div className="grid grid-cols-[repeat(10,minmax(150px,1fr))] gap-px bg-border">
+    <div className="overflow-hidden rounded-2xl border border-border">
+      <div className="grid grid-cols-[repeat(10,minmax(0,1fr))] gap-px bg-border">
         {columnas.map(({ club, porPosicion }) => (
-          <div key={club} className="bg-background">
-            <p className="border-b border-border bg-background-elevated px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-neon-purple">
+          <div key={club} className="min-w-0 bg-background">
+            <p className="truncate border-b border-border bg-background-elevated px-1 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-neon-purple">
               {club}
             </p>
             <div className="flex flex-col gap-2.5 px-1.5 py-2">
@@ -135,7 +135,7 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
                           onClick={() => onFichar(j)}
                           disabled={!datos.esMiTurno || ficharEnCurso === j.id}
                           title={datos.esMiTurno ? "Fichar" : "Solo puede fichar quien tenga el turno"}
-                          className="truncate rounded px-1.5 py-1 text-left text-[11px] leading-tight text-foreground transition hover:bg-white/10 disabled:hover:bg-transparent"
+                          className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] leading-tight text-foreground transition hover:bg-white/10 disabled:hover:bg-transparent"
                         >
                           {estrella}
                           {ficharEnCurso === j.id ? "…" : j.nombre}
@@ -150,7 +150,7 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
                             ? `${j.teamName} ${j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}`
                             : j.posicionCodigo
                         }
-                        className={`truncate rounded px-1.5 py-1 text-[11px] leading-tight ${
+                        className={`block w-full truncate rounded px-1.5 py-1 text-[11px] leading-tight ${
                           esMio
                             ? "font-bold text-neon-green"
                             : j.ocupado
@@ -332,20 +332,6 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     });
   }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
 
-  // Igual que `filtrados`, pero sin aplicar "solo libres" — en la vista
-  // por club el punto es precisamente ver los ya fichados tachados junto
-  // a los libres, no ocultarlos.
-  const filtradosPorClub = useMemo(() => {
-    return datos.pool.filter((j) => {
-      if (posicion !== "TODOS" && j.posicionCodigo !== posicion) return false;
-      if (club !== "TODOS" && j.club !== club) return false;
-      if (busqueda && !j.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false;
-      if (soloMiEquipo) return j.teamId === miTeamId;
-      if (soloWishlist && !wishlist.has(j.id)) return false;
-      return true;
-    });
-  }, [datos.pool, posicion, club, busqueda, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
-
   function comparar(a, b) {
     let va;
     let vb;
@@ -441,73 +427,60 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         </p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
-        <div className="flex gap-1.5">
-          <ChipFiltro activo={vista === "lista"} onClick={() => setVista("lista")}>
-            📋 Lista
-          </ChipFiltro>
-          <ChipFiltro activo={vista === "club"} onClick={() => setVista("club")}>
-            🏟️ Por club
-          </ChipFiltro>
-        </div>
+      <div className="mt-6 flex flex-wrap items-center gap-1">
+        <ChipFiltro compacto activo={vista === "lista"} onClick={() => setVista("lista")}>
+          📋
+        </ChipFiltro>
+        <ChipFiltro compacto activo={vista === "club"} onClick={() => setVista("club")}>
+          🏟️
+        </ChipFiltro>
 
-        <div className="flex flex-wrap gap-1.5">
-          <ChipFiltro activo={posicion === "TODOS"} onClick={() => setPosicion("TODOS")}>
-            Todos
+        <span className="mx-0.5 h-4 w-px bg-border" />
+
+        <ChipFiltro compacto activo={posicion === "TODOS"} onClick={() => setPosicion("TODOS")}>
+          Todos
+        </ChipFiltro>
+        {POSICIONES.map((p) => (
+          <ChipFiltro compacto key={p.codigo} activo={posicion === p.codigo} onClick={() => setPosicion(p.codigo)}>
+            {p.codigo}
           </ChipFiltro>
-          {POSICIONES.map((p) => (
-            <ChipFiltro key={p.codigo} activo={posicion === p.codigo} onClick={() => setPosicion(p.codigo)}>
-              {p.codigo}
-            </ChipFiltro>
+        ))}
+
+        <select
+          value={club}
+          onChange={(e) => setClub(e.target.value)}
+          className="w-20 shrink-0 rounded-lg border border-border bg-background px-1.5 py-1 text-[11px] outline-none focus:border-neon-green"
+        >
+          <option value="TODOS">Club</option>
+          {clubes.map((c) => (
+            <option key={c} value={c}>{c}</option>
           ))}
-        </div>
+        </select>
 
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="text-muted">Club</span>
-          <select
-            value={club}
-            onChange={(e) => setClub(e.target.value)}
-            className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-neon-green"
-          >
-            <option value="TODOS">Todos</option>
-            {clubes.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </label>
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar..."
+          className="w-20 shrink-0 rounded-lg border border-border bg-background px-1.5 py-1 text-[11px] outline-none focus:border-neon-green"
+        />
 
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="text-muted">Buscar jugador</span>
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="nombre..."
-            className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-neon-green"
-          />
-        </label>
+        <span className="mx-0.5 h-4 w-px bg-border" />
 
-        <div className="flex flex-wrap gap-1.5">
-          <ChipFiltro
-            activo={soloLibres}
-            onClick={() => setSoloLibres((v) => !v)}
-            disabled={vista === "club"}
-            title={vista === "club" ? "En la vista por club se ven todos, tachados los ya fichados" : undefined}
-          >
-            Solo libres
-          </ChipFiltro>
-          <ChipFiltro activo={soloWishlist} onClick={() => setSoloWishlist((v) => !v)}>
-            ★ Mi wishlist
-          </ChipFiltro>
-          <ChipFiltro activo={soloMiEquipo} onClick={alternarMiEquipo}>
-            👕 Mi equipo ({misJugadores.length})
-          </ChipFiltro>
-        </div>
+        <ChipFiltro compacto activo={soloLibres} onClick={() => setSoloLibres((v) => !v)}>
+          Libres
+        </ChipFiltro>
+        <ChipFiltro compacto activo={soloWishlist} onClick={() => setSoloWishlist((v) => !v)}>
+          ★
+        </ChipFiltro>
+        <ChipFiltro compacto activo={soloMiEquipo} onClick={alternarMiEquipo}>
+          👕 {misJugadores.length}
+        </ChipFiltro>
       </div>
 
       {vista === "club" && (
         <div className="mt-4">
           <TablaPorClub
-            jugadores={filtradosPorClub}
+            jugadores={filtrados}
             wishlist={wishlist}
             miTeamId={miTeamId}
             datos={datos}
@@ -834,14 +807,16 @@ function CabeceraOrdenable({ label, campo, ordenPor, ordenAsc, onClick }) {
   );
 }
 
-function ChipFiltro({ activo, onClick, children, disabled, title }) {
+function ChipFiltro({ activo, onClick, children, disabled, title, compacto }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
+      className={`shrink-0 whitespace-nowrap rounded-full border font-semibold transition disabled:opacity-40 ${
+        compacto ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"
+      } ${
         activo
           ? "border-neon-purple bg-neon-purple/10 text-neon-purple"
           : "border-border text-muted hover:border-white/20"
