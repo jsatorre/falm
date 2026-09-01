@@ -60,6 +60,89 @@ function picksPorEquipo(datos) {
     .sort((a, b) => b.jugadores.length - a.jugadores.length);
 }
 
+// Ataque -> portero, como en la chuleta de referencia (una tabla en la
+// que cada columna es un club real y dentro se agrupan por posición) que
+// se usaba antes en la Sheet para planear fichajes de un vistazo.
+const POSICION_ORDEN_CLUB = ["DL", "MC", "DF", "PT"];
+
+function agruparPorClub(jugadores) {
+  const porClub = new Map(); // club -> jugadores[]
+  for (const j of jugadores) {
+    if (!porClub.has(j.club)) porClub.set(j.club, []);
+    porClub.get(j.club).push(j);
+  }
+  return [...porClub.entries()]
+    .map(([club, lista]) => ({
+      club,
+      porPosicion: POSICION_ORDEN_CLUB.map((codigo) => ({
+        codigo,
+        jugadores: lista
+          .filter((j) => j.posicionCodigo === codigo)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+      })).filter((g) => g.jugadores.length > 0),
+    }))
+    .sort((a, b) => a.club.localeCompare(b.club, "es"));
+}
+
+/**
+ * Vista alternativa al listado: una columna por club real (como la
+ * chuleta que se usaba en la Sheet), con los jugadores agrupados por
+ * posición dentro de cada una. Los ya fichados (por cualquiera) se ven
+ * tachados; los tuyos, además, en verde y sin tachar (siguen "cogidos"
+ * pero por ti); los de tu wishlist llevan estrella. Es solo de consulta —
+ * fichar sigue haciéndose desde la vista de lista.
+ */
+function TablaPorClub({ jugadores, wishlist, miTeamId }) {
+  const columnas = useMemo(() => agruparPorClub(jugadores), [jugadores]);
+
+  if (columnas.length === 0) {
+    return <p className="text-sm text-muted">No hay ningún jugador que cumpla ese filtro.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-border">
+      <div className="flex w-max divide-x divide-border">
+        {columnas.map(({ club, porPosicion }) => (
+          <div key={club} className="w-36 shrink-0">
+            <p className="border-b border-border bg-background-elevated px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-neon-purple">
+              {club}
+            </p>
+            <div className="flex flex-col gap-2.5 px-1.5 py-2">
+              {porPosicion.map((grupo) => (
+                <div key={grupo.codigo} className="flex flex-col">
+                  {grupo.jugadores.map((j) => {
+                    const esMio = j.ocupado && j.teamId === miTeamId;
+                    return (
+                      <span
+                        key={j.id}
+                        title={
+                          j.ocupado
+                            ? `${j.teamName} ${j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}`
+                            : j.posicionCodigo
+                        }
+                        className={`truncate rounded px-1.5 py-1 text-[11px] leading-tight ${
+                          esMio
+                            ? "font-bold text-neon-green"
+                            : j.ocupado
+                              ? "text-muted/50 line-through"
+                              : "text-foreground"
+                        }`}
+                      >
+                        {wishlist.has(j.id) && <span className="mr-0.5 text-amber-400">★</span>}
+                        {j.nombre}
+                      </span>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ResumenDraft({ datos }) {
   const [copiadoTeamId, setCopiadoTeamId] = useState(null);
   const grupos = useMemo(() => picksPorEquipo(datos), [datos]);
@@ -137,6 +220,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [pendienteRetiro, setPendienteRetiro] = useState(false);
   const [ordenPor, setOrdenPor] = useState("nombre"); // alfabético por defecto, la API de Biwenger no trae ningún orden útil
   const [ordenAsc, setOrdenAsc] = useState(true);
+  const [vista, setVista] = useState("lista"); // "lista" | "club"
 
   const refrescar = useCallback(async () => {
     const res = await fetch("/api/draft", { cache: "no-store" });
@@ -217,6 +301,20 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
       return true;
     });
   }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
+
+  // Igual que `filtrados`, pero sin aplicar "solo libres" — en la vista
+  // por club el punto es precisamente ver los ya fichados tachados junto
+  // a los libres, no ocultarlos.
+  const filtradosPorClub = useMemo(() => {
+    return datos.pool.filter((j) => {
+      if (posicion !== "TODOS" && j.posicionCodigo !== posicion) return false;
+      if (club !== "TODOS" && j.club !== club) return false;
+      if (busqueda && !j.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false;
+      if (soloMiEquipo) return j.teamId === miTeamId;
+      if (soloWishlist && !wishlist.has(j.id)) return false;
+      return true;
+    });
+  }, [datos.pool, posicion, club, busqueda, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
 
   function comparar(a, b) {
     let va;
@@ -350,7 +448,12 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         </label>
 
         <div className="flex flex-wrap gap-1.5">
-          <ChipFiltro activo={soloLibres} onClick={() => setSoloLibres((v) => !v)}>
+          <ChipFiltro
+            activo={soloLibres}
+            onClick={() => setSoloLibres((v) => !v)}
+            disabled={vista === "club"}
+            title={vista === "club" ? "En la vista por club se ven todos, tachados los ya fichados" : undefined}
+          >
             Solo libres
           </ChipFiltro>
           <ChipFiltro activo={soloWishlist} onClick={() => setSoloWishlist((v) => !v)}>
@@ -360,8 +463,24 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
             👕 Mi equipo ({misJugadores.length})
           </ChipFiltro>
         </div>
+
+        <div className="flex gap-1.5">
+          <ChipFiltro activo={vista === "lista"} onClick={() => setVista("lista")}>
+            📋 Lista
+          </ChipFiltro>
+          <ChipFiltro activo={vista === "club"} onClick={() => setVista("club")}>
+            🏟️ Por club
+          </ChipFiltro>
+        </div>
       </div>
 
+      {vista === "club" && (
+        <div className="mt-4">
+          <TablaPorClub jugadores={filtradosPorClub} wishlist={wishlist} miTeamId={miTeamId} />
+        </div>
+      )}
+
+      {vista === "lista" && (
       <div className="mt-4 flex flex-col gap-6">
         {grupos.map((grupo) => (
           <div key={grupo.codigo} className="overflow-x-auto rounded-2xl border border-border">
@@ -437,6 +556,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
           <p className="text-sm text-muted">No hay ningún jugador que cumpla ese filtro.</p>
         )}
       </div>
+      )}
 
       <p className="mt-4 text-xs text-muted">
         Fichar aquí es solo un apunte interno del draft, no compra al jugador de verdad en
@@ -677,12 +797,14 @@ function CabeceraOrdenable({ label, campo, ordenPor, ordenAsc, onClick }) {
   );
 }
 
-function ChipFiltro({ activo, onClick, children }) {
+function ChipFiltro({ activo, onClick, children, disabled, title }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+      disabled={disabled}
+      title={title}
+      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
         activo
           ? "border-neon-purple bg-neon-purple/10 text-neon-purple"
           : "border-border text-muted hover:border-white/20"
