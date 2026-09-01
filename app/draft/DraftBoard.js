@@ -62,8 +62,16 @@ function picksPorEquipo(datos) {
 
 // Ataque -> portero, como en la chuleta de referencia (una tabla en la
 // que cada columna es un club real y dentro se agrupan por posición) que
-// se usaba antes en la Sheet para planear fichajes de un vistazo.
+// se usaba antes en la Sheet para planear fichajes de un vistazo. Un color
+// por línea del campo (igual de adelante hacia atrás) para que la
+// separación entre bloques se vea de un vistazo, no solo por el hueco.
 const POSICION_ORDEN_CLUB = ["DL", "MC", "DF", "PT"];
+const COLOR_POSICION_CLUB = {
+  DL: "text-neon-pink",
+  MC: "text-neon-purple",
+  DF: "text-neon-green",
+  PT: "text-neon-orange",
+};
 
 function agruparPorClub(jugadores) {
   const porClub = new Map(); // club -> jugadores[]
@@ -86,13 +94,14 @@ function agruparPorClub(jugadores) {
 
 /**
  * Vista alternativa al listado: una columna por club real (como la
- * chuleta que se usaba en la Sheet), con los jugadores agrupados por
- * posición dentro de cada una. Los ya fichados (por cualquiera) se ven
- * tachados; los tuyos, además, en verde y sin tachar (siguen "cogidos"
- * pero por ti); los de tu wishlist llevan estrella. Es solo de consulta —
- * fichar sigue haciéndose desde la vista de lista.
+ * chuleta que se usaba en la Sheet, 10 clubes por fila), con los
+ * jugadores agrupados por posición dentro de cada una y etiquetados por
+ * color. Los ya fichados (por cualquiera) se ven tachados; los tuyos,
+ * además, en verde y sin tachar (siguen "cogidos" pero por ti); los de tu
+ * wishlist llevan estrella. Los libres se pueden fichar tocándolos
+ * directamente, igual que en la lista (solo si es tu turno).
  */
-function TablaPorClub({ jugadores, wishlist, miTeamId }) {
+function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onFichar }) {
   const columnas = useMemo(() => agruparPorClub(jugadores), [jugadores]);
 
   if (columnas.length === 0) {
@@ -101,17 +110,38 @@ function TablaPorClub({ jugadores, wishlist, miTeamId }) {
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-border">
-      <div className="flex w-max divide-x divide-border">
+      <div className="grid grid-cols-[repeat(10,minmax(150px,1fr))] gap-px bg-border">
         {columnas.map(({ club, porPosicion }) => (
-          <div key={club} className="w-36 shrink-0">
+          <div key={club} className="bg-background">
             <p className="border-b border-border bg-background-elevated px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-neon-purple">
               {club}
             </p>
             <div className="flex flex-col gap-2.5 px-1.5 py-2">
               {porPosicion.map((grupo) => (
                 <div key={grupo.codigo} className="flex flex-col">
+                  <p className={`mb-0.5 text-[9px] font-bold uppercase tracking-wider ${COLOR_POSICION_CLUB[grupo.codigo]}`}>
+                    {grupo.codigo}
+                  </p>
                   {grupo.jugadores.map((j) => {
                     const esMio = j.ocupado && j.teamId === miTeamId;
+                    const puedeFichar = !j.ocupado && !datos.terminado;
+                    const estrella = wishlist.has(j.id) && <span className="mr-0.5 text-amber-400">★</span>;
+
+                    if (puedeFichar) {
+                      return (
+                        <button
+                          key={j.id}
+                          type="button"
+                          onClick={() => onFichar(j)}
+                          disabled={!datos.esMiTurno || ficharEnCurso === j.id}
+                          title={datos.esMiTurno ? "Fichar" : "Solo puede fichar quien tenga el turno"}
+                          className="truncate rounded px-1.5 py-1 text-left text-[11px] leading-tight text-foreground transition hover:bg-white/10 disabled:hover:bg-transparent"
+                        >
+                          {estrella}
+                          {ficharEnCurso === j.id ? "…" : j.nombre}
+                        </button>
+                      );
+                    }
                     return (
                       <span
                         key={j.id}
@@ -128,7 +158,7 @@ function TablaPorClub({ jugadores, wishlist, miTeamId }) {
                               : "text-foreground"
                         }`}
                       >
-                        {wishlist.has(j.id) && <span className="mr-0.5 text-amber-400">★</span>}
+                        {estrella}
                         {j.nombre}
                       </span>
                     );
@@ -412,6 +442,15 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
       )}
 
       <div className="mt-6 flex flex-wrap items-end gap-3">
+        <div className="flex gap-1.5">
+          <ChipFiltro activo={vista === "lista"} onClick={() => setVista("lista")}>
+            📋 Lista
+          </ChipFiltro>
+          <ChipFiltro activo={vista === "club"} onClick={() => setVista("club")}>
+            🏟️ Por club
+          </ChipFiltro>
+        </div>
+
         <div className="flex flex-wrap gap-1.5">
           <ChipFiltro activo={posicion === "TODOS"} onClick={() => setPosicion("TODOS")}>
             Todos
@@ -463,20 +502,18 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
             👕 Mi equipo ({misJugadores.length})
           </ChipFiltro>
         </div>
-
-        <div className="flex gap-1.5">
-          <ChipFiltro activo={vista === "lista"} onClick={() => setVista("lista")}>
-            📋 Lista
-          </ChipFiltro>
-          <ChipFiltro activo={vista === "club"} onClick={() => setVista("club")}>
-            🏟️ Por club
-          </ChipFiltro>
-        </div>
       </div>
 
       {vista === "club" && (
         <div className="mt-4">
-          <TablaPorClub jugadores={filtradosPorClub} wishlist={wishlist} miTeamId={miTeamId} />
+          <TablaPorClub
+            jugadores={filtradosPorClub}
+            wishlist={wishlist}
+            miTeamId={miTeamId}
+            datos={datos}
+            ficharEnCurso={ficharEnCurso}
+            onFichar={setPendienteFichar}
+          />
         </div>
       )}
 
