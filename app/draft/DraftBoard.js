@@ -62,17 +62,22 @@ function picksPorEquipo(datos) {
 
 // Ataque -> portero, como en la chuleta de referencia (una tabla en la
 // que cada columna es un club real y dentro se agrupan por posición) que
-// se usaba antes en la Sheet para planear fichajes de un vistazo. Un color
-// por línea del campo (igual de adelante hacia atrás) para que la
+// se usaba antes en la Sheet para planear fichajes de un vistazo. Un
+// puntito de color por línea del campo (no el texto entero, que a este
+// tamaño y sobre negro resultaba demasiado brillante) para que la
 // separación entre bloques se vea de un vistazo, no solo por el hueco.
 const POSICION_ORDEN_CLUB = ["DL", "MC", "DF", "PT"];
 const COLOR_POSICION_CLUB = {
-  DL: "text-neon-pink",
-  MC: "text-neon-purple",
-  DF: "text-neon-green",
-  PT: "text-neon-orange",
+  DL: "var(--neon-pink)",
+  MC: "var(--neon-purple)",
+  DF: "var(--neon-green)",
+  PT: "var(--neon-orange)",
 };
 
+// A diferencia de antes, no se filtran los bloques de posición vacíos —
+// todos los clubes llevan sus 4 bloques (DL/MC/DF/PT) aunque estén
+// vacíos, para poder rellenarlos luego hasta una altura común y que las
+// etiquetas de posición queden alineadas entre columnas.
 function agruparPorClub(jugadores) {
   const porClub = new Map(); // club -> jugadores[]
   for (const j of jugadores) {
@@ -87,7 +92,7 @@ function agruparPorClub(jugadores) {
         jugadores: lista
           .filter((j) => j.posicionCodigo === codigo)
           .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
-      })).filter((g) => g.jugadores.length > 0),
+      })),
     }))
     .sort((a, b) => a.club.localeCompare(b.club, "es"));
 }
@@ -105,6 +110,20 @@ function agruparPorClub(jugadores) {
 function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onFichar, onAlternarWishlist }) {
   const columnas = useMemo(() => agruparPorClub(jugadores), [jugadores]);
 
+  // Cuántos jugadores tiene, como máximo, un mismo club en cada posición
+  // — para rellenar el resto de columnas hasta esa altura y que la línea
+  // "MC"/"DF"/"PT" empiece siempre a la misma altura en todas.
+  const maxPorPosicion = useMemo(() => {
+    const max = {};
+    for (const codigo of POSICION_ORDEN_CLUB) {
+      max[codigo] = columnas.reduce((m, c) => {
+        const grupo = c.porPosicion.find((g) => g.codigo === codigo);
+        return Math.max(m, grupo?.jugadores.length ?? 0);
+      }, 0);
+    }
+    return max;
+  }, [columnas]);
+
   if (columnas.length === 0) {
     return <p className="text-sm text-muted">No hay ningún jugador que cumpla ese filtro.</p>;
   }
@@ -120,7 +139,11 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
             <div className="flex flex-col gap-2.5 px-1.5 py-2">
               {porPosicion.map((grupo) => (
                 <div key={grupo.codigo} className="flex flex-col">
-                  <p className={`mb-0.5 text-[9px] font-bold uppercase tracking-wider ${COLOR_POSICION_CLUB[grupo.codigo]}`}>
+                  <p className="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: COLOR_POSICION_CLUB[grupo.codigo] }}
+                    />
                     {grupo.codigo}
                   </p>
                   {grupo.jugadores.map((j) => {
@@ -169,6 +192,12 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
                       </div>
                     );
                   })}
+                  {Array.from({ length: maxPorPosicion[grupo.codigo] - grupo.jugadores.length }).map((_, i) => (
+                    <div key={`relleno-${i}`} className="invisible flex items-center gap-0.5">
+                      <span className="text-[10px] leading-none">☆</span>
+                      <span className="block min-w-0 flex-1 px-1 py-1 text-[11px] leading-tight">·</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
