@@ -9,11 +9,11 @@ export default async function DraftPage() {
 
   const [estado, { data: wishlist }] = await Promise.all([
     getEstadoDraft(),
-    supabase.from("draft_wishlist").select("player_id").eq("team_id", teamId).order("created_at", { ascending: true }),
+    supabase.from("draft_wishlist").select("player_id, top").eq("team_id", teamId).order("created_at", { ascending: true }),
   ]);
 
   const inicial = shapeEstadoDraft(estado, teamId);
-  const wishlistInicial = (wishlist ?? []).map((w) => w.player_id);
+  const wishlistInicial = (wishlist ?? []).map((w) => ({ playerId: w.player_id, top: w.top }));
 
   return <DraftBoard inicial={inicial} miTeamId={teamId} wishlistInicial={wishlistInicial} />;
 }

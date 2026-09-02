@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 
 const POLL_MS = 5000; // el draft es un evento en vivo e interactivo, más rápido que el resto de polling de la app
 
+// wishlist: Map<playerId, top>. undefined = fuera (☆), false = favorito
+// (★), true = top favorito (🔥) — ver alternarWishlist para el ciclo.
+function iconoWishlist(wishlist, playerId) {
+  if (!wishlist.has(playerId)) return "☆";
+  return wishlist.get(playerId) ? "🔥" : "★";
+}
+
 const POSICIONES = [
   { codigo: "PT", nombre: "Porteros" },
   { codigo: "DF", nombre: "Defensas" },
@@ -216,10 +223,10 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
                         <button
                           type="button"
                           onClick={() => onAlternarWishlist(j.id)}
-                          title="Añadir/quitar de mi wishlist"
-                          className={`shrink-0 text-[10px] leading-none ${enWishlist ? "text-amber-400" : "text-muted/40 hover:text-muted"}`}
+                          title="Favorito / top favorito — toca para ir cambiando"
+                          className={`shrink-0 text-[10px] leading-none ${enWishlist ? "" : "text-muted/40 hover:text-muted"} ${wishlist.get(j.id) === false ? "text-amber-400" : ""}`}
                         >
-                          {enWishlist ? "★" : "☆"}
+                          {iconoWishlist(wishlist, j.id)}
                         </button>
                         {puedeFichar ? (
                           <button
@@ -333,7 +340,8 @@ function ResumenDraft({ datos }) {
 
 export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [datos, setDatos] = useState(inicial);
-  const [wishlist, setWishlist] = useState(new Set(wishlistInicial));
+  // playerId -> top (false = favorito ★, true = top favorito 🔥)
+  const [wishlist, setWishlist] = useState(new Map(wishlistInicial.map((w) => [w.playerId, w.top])));
   const [posicion, setPosicion] = useState("TODOS");
   const [club, setClub] = useState("TODOS");
   const [busqueda, setBusqueda] = useState("");
@@ -393,21 +401,25 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     }
   }
 
+  // Ciclo ☆ (fuera) -> ★ (favorito) -> 🔥 (top favorito) -> ☆ de nuevo.
   async function alternarWishlist(playerId) {
-    const yaEsta = wishlist.has(playerId);
+    const actual = wishlist.has(playerId) ? (wishlist.get(playerId) ? "top" : "favorito") : "fuera";
+    const siguiente = actual === "fuera" ? "favorito" : actual === "favorito" ? "top" : "fuera";
+
     setWishlist((prev) => {
-      const copia = new Set(prev);
-      if (yaEsta) copia.delete(playerId);
-      else copia.add(playerId);
+      const copia = new Map(prev);
+      if (siguiente === "fuera") copia.delete(playerId);
+      else copia.set(playerId, siguiente === "top");
       return copia;
     });
-    if (yaEsta) {
+
+    if (siguiente === "fuera") {
       await fetch(`/api/draft/wishlist?playerId=${playerId}`, { method: "DELETE" });
     } else {
       await fetch("/api/draft/wishlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId }),
+        body: JSON.stringify({ playerId, top: siguiente === "top" }),
       });
     }
   }
@@ -620,10 +632,10 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
                       <button
                         type="button"
                         onClick={() => alternarWishlist(j.id)}
-                        className={`text-sm sm:text-base ${wishlist.has(j.id) ? "text-amber-400" : "text-muted/40 hover:text-muted"}`}
-                        title="Añadir/quitar de mi wishlist"
+                        className={`text-sm sm:text-base ${wishlist.has(j.id) ? "" : "text-muted/40 hover:text-muted"} ${wishlist.get(j.id) === false ? "text-amber-400" : ""}`}
+                        title="Favorito / top favorito — toca para ir cambiando"
                       >
-                        {wishlist.has(j.id) ? "★" : "☆"}
+                        {iconoWishlist(wishlist, j.id)}
                       </button>
                     </td>
                     <td className="truncate px-1.5 py-2 font-medium text-foreground sm:px-3 sm:py-2.5">
