@@ -156,7 +156,7 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border">
-      <div className="grid grid-cols-[repeat(10,minmax(0,1fr))] gap-px bg-border">
+      <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
         {columnas.map(({ club, porPosicion }) => (
           <div key={club} className="min-w-0 bg-background">
             <p className="truncate border-b border-border bg-background-elevated px-1 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-neon-purple">
