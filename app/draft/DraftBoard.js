@@ -374,7 +374,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
       for (const p of nuevosPicks) {
         const id = `${p.pickIndex}-${Date.now()}`;
         setToasts((prev) => [...prev, { id, teamName: p.teamName, playerName: p.playerName }]);
-        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
       }
     }
 
@@ -535,15 +535,16 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
-      <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex flex-col items-center gap-2 px-4">
+      <div className="pointer-events-none fixed inset-x-0 top-6 z-50 flex flex-col items-center gap-3 px-4">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="float-up rounded-full border border-neon-green/40 bg-background-elevated/95 px-4 py-2 text-xs shadow-xl backdrop-blur sm:text-sm"
+            className="float-up glow-green flex items-center gap-2 rounded-2xl border-2 border-neon-green bg-background-elevated px-6 py-4 text-base font-bold shadow-2xl sm:gap-3 sm:px-8 sm:py-5 sm:text-2xl"
           >
-            <span className="font-bold text-neon-green">{t.teamName}</span>
-            <span className="text-muted"> ha fichado a </span>
-            <span className="font-bold text-foreground">{t.playerName}</span>
+            <span className="text-xl sm:text-3xl">⚡</span>
+            <span className="text-neon-green">{t.teamName}</span>
+            <span className="font-normal text-muted">ha fichado a</span>
+            <span className="text-foreground">{t.playerName}</span>
           </div>
         ))}
       </div>
