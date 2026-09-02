@@ -1,6 +1,7 @@
 import { COOKIE_NAME, equipoDeSesion } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabaseServer";
 import { getEstadoDraft, puedeFichar } from "../../../lib/draftEngine";
+import { enviarPushEquipo } from "../../../lib/push";
 
 export async function POST(request) {
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
@@ -44,6 +45,23 @@ export async function POST(request) {
     .update({ current_pick: estado.currentPick + 1 })
     .eq("id", true);
   if (updateError) return Response.json({ error: updateError.message }, { status: 500 });
+
+  // Avisar por push al equipo al que le toca ahora — se relee el estado
+  // porque el turno real puede haber saltado más de un pick (equipos
+  // retirados). Es solo un aviso de cortesía: si falla, no debe tumbar la
+  // respuesta ni el fichaje ya hecho.
+  try {
+    const siguiente = await getEstadoDraft();
+    if (siguiente.enMarcha && !siguiente.terminado && siguiente.turnoDeTeamId) {
+      await enviarPushEquipo(siguiente.turnoDeTeamId, {
+        title: "¡Te toca fichar!",
+        body: `${estado.equipoPorId[teamId]?.name ?? "Un equipo"} ha fichado a ${jugador.nombre} — ahora te toca a ti.`,
+        url: "/draft",
+      });
+    }
+  } catch (err) {
+    console.warn("No se ha podido avisar por push del siguiente turno del draft:", err);
+  }
 
   return Response.json({ ok: true });
 }
