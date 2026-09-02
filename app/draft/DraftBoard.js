@@ -11,6 +11,32 @@ const POSICIONES = [
   { codigo: "DL", nombre: "Delanteros" },
 ];
 
+// Solo para la columna "Club" de la lista en móvil, donde no cabe el
+// nombre completo — en pantallas más anchas (sm:) se sigue viendo el
+// nombre entero.
+const CLUB_ABREVIADO = {
+  "Alavés": "ALA",
+  "Athletic": "ATH",
+  "Atlético": "ATM",
+  "Barcelona": "BAR",
+  "Betis": "BET",
+  "Celta": "CEL",
+  "Deportivo": "DEP",
+  "Elche": "ELC",
+  "Espanyol": "ESP",
+  "Getafe": "GET",
+  "Levante": "LEV",
+  "Málaga": "MAL",
+  "Osasuna": "OSA",
+  "Racing": "RAC",
+  "Rayo Vallecano": "RAY",
+  "Real Madrid": "RMA",
+  "Real Sociedad": "RSO",
+  "Sevilla": "SEV",
+  "Valencia": "VAL",
+  "Villarreal": "VIL",
+};
+
 /**
  * Próximos `cantidad` turnos a partir de currentPick (0 = el turno actual),
  * saltándose los equipos retirados — mismo cálculo de orden serpiente +
@@ -529,63 +555,75 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
       {vista === "lista" && (
       <div className="mt-4 flex flex-col gap-6">
         {grupos.map((grupo) => (
-          <div key={grupo.codigo} className="overflow-x-auto rounded-2xl border border-border">
+          <div key={grupo.codigo} className="overflow-hidden rounded-2xl border border-border">
             {grupo.nombre && (
-              <p className="border-b border-border bg-background-elevated px-3 py-2 text-xs font-bold uppercase tracking-wider text-neon-purple">
+              <p className="border-b border-border bg-background-elevated px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-neon-purple sm:px-3 sm:py-2">
                 {grupo.nombre}
               </p>
             )}
-            <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
+            <table className="w-full table-fixed border-collapse text-sm">
               <colgroup>
-                <col className="w-[6%]" />
-                <col className="w-[34%]" />
-                <col className="w-[20%]" />
-                <col className="w-[24%]" />
-                <col className="w-[16%]" />
+                <col className="w-7 sm:w-[6%]" />
+                <col />
+                <col className="w-12 sm:w-[20%]" />
+                <col className="w-6 sm:w-[24%]" />
+                <col className="w-14 sm:w-[16%]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
-                  <th className="px-3 py-3 font-medium">★</th>
+                  <th className="px-1.5 py-2 font-medium sm:px-3 sm:py-3">★</th>
                   <CabeceraOrdenable label="Jugador" campo="nombre" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
                   <CabeceraOrdenable label="Club" campo="club" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
                   <CabeceraOrdenable label="Estado" campo="estado" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
-                  <th className="px-3 py-3 font-medium"></th>
+                  <th className="px-1.5 py-2 font-medium sm:px-3 sm:py-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {grupo.jugadores.map((j) => (
                   <tr key={j.id} className="border-b border-border/60 last:border-0 hover:bg-white/[0.03]">
-                    <td className="px-3 py-2.5">
+                    <td className="px-1.5 py-2 sm:px-3 sm:py-2.5">
                       <button
                         type="button"
                         onClick={() => alternarWishlist(j.id)}
-                        className={`text-base ${wishlist.has(j.id) ? "text-amber-400" : "text-muted/40 hover:text-muted"}`}
+                        className={`text-sm sm:text-base ${wishlist.has(j.id) ? "text-amber-400" : "text-muted/40 hover:text-muted"}`}
                         title="Añadir/quitar de mi wishlist"
                       >
                         {wishlist.has(j.id) ? "★" : "☆"}
                       </button>
                     </td>
-                    <td className="truncate px-3 py-2.5 font-medium text-foreground">
+                    <td className="truncate px-1.5 py-2 font-medium text-foreground sm:px-3 sm:py-2.5">
                       {j.nombre}
                       <span className="ml-1.5 text-xs text-muted">{j.posicionCodigo}</span>
                     </td>
-                    <td className="truncate px-3 py-2.5 text-muted">{j.club}</td>
-                    <td className="truncate px-3 py-2.5">
+                    <td className="truncate px-1 py-2 text-muted sm:px-3 sm:py-2.5">
+                      <span className="sm:hidden">{CLUB_ABREVIADO[j.club] ?? j.club.slice(0, 3).toUpperCase()}</span>
+                      <span className="hidden sm:inline">{j.club}</span>
+                    </td>
+                    <td className="px-1.5 py-2 sm:px-3 sm:py-2.5">
                       {j.ocupado ? (
-                        <span className="text-xs text-muted">
-                          {j.teamName} {j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}
-                        </span>
+                        <>
+                          <span
+                            title={`${j.teamName} ${j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}`}
+                            className="mx-auto block h-2 w-2 rounded-full bg-muted/50 sm:hidden"
+                          />
+                          <span className="hidden truncate text-xs text-muted sm:inline">
+                            {j.teamName} {j.origen === "biwenger" ? "(Biwenger)" : "(draft)"}
+                          </span>
+                        </>
                       ) : (
-                        <span className="text-xs text-neon-green">Libre</span>
+                        <>
+                          <span title="Libre" className="mx-auto block h-2 w-2 rounded-full bg-neon-green sm:hidden" />
+                          <span className="hidden text-xs text-neon-green sm:inline">Libre</span>
+                        </>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-right">
+                    <td className="px-1.5 py-2 text-right sm:px-3 sm:py-2.5">
                       {!j.ocupado && !datos.terminado && (
                         <button
                           type="button"
                           onClick={() => setPendienteFichar(j)}
                           disabled={!datos.esMiTurno || ficharEnCurso === j.id}
-                          className="rounded-lg bg-neon-pink px-3 py-1.5 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-30"
+                          className="rounded-lg bg-neon-pink px-2 py-1 text-[11px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-30 sm:px-3 sm:py-1.5 sm:text-xs"
                           title={datos.esMiTurno ? "Fichar" : "Solo puede fichar quien tenga el turno"}
                         >
                           {ficharEnCurso === j.id ? "…" : "Fichar"}
