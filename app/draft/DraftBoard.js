@@ -440,10 +440,21 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     });
   }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
 
+  // Para ordenar por la columna ★: top favorito (🔥) primero, luego
+  // favorito (★), luego el resto — números bajos = más arriba, así el
+  // orden ascendente por defecto ya deja lo más importante arriba.
+  function rangoWishlist(playerId) {
+    if (!wishlist.has(playerId)) return 2;
+    return wishlist.get(playerId) ? 0 : 1;
+  }
+
   function comparar(a, b) {
     let va;
     let vb;
-    if (ordenPor === "estado") {
+    if (ordenPor === "wishlist") {
+      va = rangoWishlist(a.id);
+      vb = rangoWishlist(b.id);
+    } else if (ordenPor === "estado") {
       va = a.ocupado ? a.teamName ?? "" : "";
       vb = b.ocupado ? b.teamName ?? "" : "";
     } else {
@@ -618,7 +629,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
               </colgroup>
               <thead>
                 <tr className="border-b border-border bg-background-elevated text-left text-xs uppercase tracking-wider text-muted">
-                  <th className="px-1.5 py-2 font-medium sm:px-3 sm:py-3">★</th>
+                  <CabeceraOrdenable label="★" campo="wishlist" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
                   <CabeceraOrdenable label="Jugador" campo="nombre" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
                   <CabeceraOrdenable label="Club" campo="club" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
                   <CabeceraOrdenable label="Estado" campo="estado" ordenPor={ordenPor} ordenAsc={ordenAsc} onClick={alternarOrden} />
