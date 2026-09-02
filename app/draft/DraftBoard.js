@@ -920,7 +920,7 @@ function TurnoFlotante({ datos, equipoDe, equipoTurno, miProximoPaso, proximoTea
         onClick={() => setAbierto((v) => !v)}
         className={`flex items-center gap-2 rounded-full border-2 py-2 pl-2 pr-4 shadow-xl transition ${
           datos.esMiTurno
-            ? "animate-pulse border-neon-green bg-neon-green/10"
+            ? "animate-bounce border-neon-green bg-neon-green/10"
             : "border-border bg-background-elevated"
         }`}
       >
