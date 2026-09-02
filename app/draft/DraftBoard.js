@@ -371,10 +371,15 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     const nuevosPicks = nuevo.picks.filter((p) => p.pickIndex > ultimoPickVistoRef.current);
     if (nuevosPicks.length > 0) {
       ultimoPickVistoRef.current = Math.max(...nuevosPicks.map((p) => p.pickIndex));
+      // El turno actual ya reflejado en `nuevo` es el mismo para todos los
+      // picks nuevos de esta tanda (aunque hayan llegado varios de golpe,
+      // solo el último importa) — se añade a cada aviso para resaltar de
+      // un vistazo a quién le toca ahora, no solo quién acaba de fichar.
+      const equipoTurnoNombre = nuevo.equipos.find((e) => e.id === nuevo.turnoDeTeamId)?.name ?? null;
       for (const p of nuevosPicks) {
         const id = `${p.pickIndex}-${Date.now()}`;
-        setToasts((prev) => [...prev, { id, teamName: p.teamName, playerName: p.playerName }]);
-        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
+        setToasts((prev) => [...prev, { id, teamName: p.teamName, playerName: p.playerName, turnoNombre: equipoTurnoNombre }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 8000);
       }
     }
 
@@ -539,12 +544,19 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="float-up glow-green flex items-center gap-2 rounded-2xl border-2 border-neon-green bg-background-elevated px-6 py-4 text-base font-bold shadow-2xl sm:gap-3 sm:px-8 sm:py-5 sm:text-2xl"
+            className="float-up glow-green flex flex-col items-center gap-1.5 rounded-2xl border-2 border-neon-green bg-background-elevated px-6 py-4 text-center shadow-2xl sm:px-8 sm:py-5"
           >
-            <span className="text-xl sm:text-3xl">⚡</span>
-            <span className="text-neon-green">{t.teamName}</span>
-            <span className="font-normal text-muted">ha fichado a</span>
-            <span className="text-foreground">{t.playerName}</span>
+            <div className="flex items-center gap-2 text-base font-bold sm:gap-3 sm:text-2xl">
+              <span className="text-xl sm:text-3xl">⚡</span>
+              <span className="text-neon-green">{t.teamName}</span>
+              <span className="font-normal text-muted">ha fichado a</span>
+              <span className="text-foreground">{t.playerName}</span>
+            </div>
+            {t.turnoNombre && (
+              <div className="pulse-live text-xs font-bold uppercase tracking-wider text-neon-orange sm:text-sm">
+                Turno de {t.turnoNombre}
+              </div>
+            )}
           </div>
         ))}
       </div>
