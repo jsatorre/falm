@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
 const POLL_MS = 5000; // el draft es un evento en vivo e interactivo, más rápido que el resto de polling de la app
 
@@ -355,10 +355,30 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [ordenPor, setOrdenPor] = useState("nombre"); // alfabético por defecto, la API de Biwenger no trae ningún orden útil
   const [ordenAsc, setOrdenAsc] = useState(true);
   const [vista, setVista] = useState("lista"); // "lista" | "club"
+  const [toasts, setToasts] = useState([]); // avisos de "X ha fichado a Y", se autodestruyen solos
+  const ultimoPickVistoRef = useRef(inicial.picks.at(-1)?.pickIndex ?? -1);
 
   const refrescar = useCallback(async () => {
     const res = await fetch("/api/draft", { cache: "no-store" });
-    if (res.ok) setDatos(await res.json());
+    if (!res.ok) return;
+    const nuevo = await res.json();
+
+    // Picks que no estaban la última vez que miramos — da igual si viene
+    // uno o varios de golpe (el polling es cada 5s, puede que se solapen
+    // varios fichajes rápidos), se avisa de todos. No depende de leer
+    // `datos` (evita el problema del closure obsoleto de useCallback con
+    // deps vacías) porque el ref siempre está al día.
+    const nuevosPicks = nuevo.picks.filter((p) => p.pickIndex > ultimoPickVistoRef.current);
+    if (nuevosPicks.length > 0) {
+      ultimoPickVistoRef.current = Math.max(...nuevosPicks.map((p) => p.pickIndex));
+      for (const p of nuevosPicks) {
+        const id = `${p.pickIndex}-${Date.now()}`;
+        setToasts((prev) => [...prev, { id, teamName: p.teamName, playerName: p.playerName }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+      }
+    }
+
+    setDatos(nuevo);
   }, []);
 
   useEffect(() => {
@@ -515,6 +535,19 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex flex-col items-center gap-2 px-4">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className="float-up rounded-full border border-neon-green/40 bg-background-elevated/95 px-4 py-2 text-xs shadow-xl backdrop-blur sm:text-sm"
+          >
+            <span className="font-bold text-neon-green">{t.teamName}</span>
+            <span className="text-muted"> ha fichado a </span>
+            <span className="font-bold text-foreground">{t.playerName}</span>
+          </div>
+        ))}
+      </div>
+
       <p className="text-xs font-medium uppercase tracking-[0.3em] text-neon-purple">Draft</p>
       <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Tablero en vivo</h1>
 
