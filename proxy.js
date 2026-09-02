@@ -48,6 +48,12 @@ export default function proxy(request) {
   return NextResponse.redirect(loginUrl);
 }
 
+// Recursos del PWA (manifest, iconos, service worker) — tienen que
+// servirse sin sesión, igual que favicon.ico: si el middleware los
+// redirige a /login para quien no tiene cookie de equipo, Chrome recibe
+// HTML en vez de JSON/JS/PNG y no puede considerar la web instalable.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icon-192|icon-512|apple-icon|icon.svg).*)",
+  ],
 };
