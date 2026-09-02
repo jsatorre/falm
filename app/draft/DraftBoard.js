@@ -133,22 +133,54 @@ function agruparPorClub(jugadores) {
  * libres se pueden fichar tocando el nombre, igual que en la lista (solo
  * si es tu turno).
  */
+// Cuántas columnas hay de verdad en cada fila visible, según el mismo
+// breakpoint que usa la rejilla (grid-cols-2/3/5/10 más abajo) — para
+// alinear el relleno de cada bloque de posición solo contra los vecinos
+// que realmente comparten fila, no contra los 20 clubes a la vez (en
+// móvil, con 2 columnas, eso dejaba huecos enormes comparando contra un
+// club lejano que no se ve al lado).
+function useColumnasPorFila() {
+  const [n, setN] = useState(2);
+  useEffect(() => {
+    function calcular() {
+      if (window.innerWidth >= 1024) return 10;
+      if (window.innerWidth >= 768) return 5;
+      if (window.innerWidth >= 640) return 3;
+      return 2;
+    }
+    function actualizar() {
+      setN(calcular());
+    }
+    actualizar();
+    window.addEventListener("resize", actualizar);
+    return () => window.removeEventListener("resize", actualizar);
+  }, []);
+  return n;
+}
+
 function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onFichar, onAlternarWishlist }) {
   const columnas = useMemo(() => agruparPorClub(jugadores), [jugadores]);
+  const columnasPorFila = useColumnasPorFila();
 
-  // Cuántos jugadores tiene, como máximo, un mismo club en cada posición
-  // — para rellenar el resto de columnas hasta esa altura y que la línea
-  // "MC"/"DF"/"PT" empiece siempre a la misma altura en todas.
-  const maxPorPosicion = useMemo(() => {
-    const max = {};
-    for (const codigo of POSICION_ORDEN_CLUB) {
-      max[codigo] = columnas.reduce((m, c) => {
-        const grupo = c.porPosicion.find((g) => g.codigo === codigo);
-        return Math.max(m, grupo?.jugadores.length ?? 0);
-      }, 0);
+  // Cuántos jugadores tiene, como máximo, un club en cada posición DENTRO
+  // DE SU MISMA FILA VISIBLE — para rellenar el resto de esa fila hasta
+  // esa altura y que la línea "MC"/"DF"/"PT" empiece a la misma altura
+  // entre los que se ven codo con codo.
+  const maxPorPosicionPorFila = useMemo(() => {
+    const filas = [];
+    for (let i = 0; i < columnas.length; i += columnasPorFila) {
+      const fila = columnas.slice(i, i + columnasPorFila);
+      const max = {};
+      for (const codigo of POSICION_ORDEN_CLUB) {
+        max[codigo] = fila.reduce((m, c) => {
+          const grupo = c.porPosicion.find((g) => g.codigo === codigo);
+          return Math.max(m, grupo?.jugadores.length ?? 0);
+        }, 0);
+      }
+      filas.push(max);
     }
-    return max;
-  }, [columnas]);
+    return filas;
+  }, [columnas, columnasPorFila]);
 
   if (columnas.length === 0) {
     return <p className="text-sm text-muted">No hay ningún jugador que cumpla ese filtro.</p>;
@@ -157,7 +189,9 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
   return (
     <div className="overflow-hidden rounded-2xl border border-border">
       <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
-        {columnas.map(({ club, porPosicion }) => (
+        {columnas.map(({ club, porPosicion }, indiceColumna) => {
+        const maxPorPosicion = maxPorPosicionPorFila[Math.floor(indiceColumna / columnasPorFila)];
+        return (
           <div key={club} className="min-w-0 bg-background">
             <p className="truncate border-b border-border bg-background-elevated px-1 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-neon-purple">
               {club}
@@ -228,7 +262,8 @@ function TablaPorClub({ jugadores, wishlist, miTeamId, datos, ficharEnCurso, onF
               ))}
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );
