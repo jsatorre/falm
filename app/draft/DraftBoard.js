@@ -347,7 +347,7 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
   const [busqueda, setBusqueda] = useState("");
   const [soloLibres, setSoloLibres] = useState(true);
   const [soloWishlist, setSoloWishlist] = useState(false);
-  const [soloMiEquipo, setSoloMiEquipo] = useState(false);
+  const [equipoFiltro, setEquipoFiltro] = useState(""); // "" = todos, o el id de un equipo (el tuyo u otro cualquiera)
   const [ficharEnCurso, setFicharEnCurso] = useState(null); // playerId en vuelo
   const [error, setError] = useState(null);
   const [pendienteFichar, setPendienteFichar] = useState(null); // jugador a confirmar, o null
@@ -453,17 +453,28 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
 
   const misJugadores = useMemo(() => datos.pool.filter((j) => j.teamId === miTeamId), [datos.pool, miTeamId]);
 
+  // Cuántos jugadores tiene ya cada equipo (Biwenger + draft) — para el
+  // desplegable de plantillas, se ve de un vistazo quién lleva cuántos.
+  const jugadoresPorEquipo = useMemo(() => {
+    const conteo = new Map();
+    for (const j of datos.pool) {
+      if (!j.teamId) continue;
+      conteo.set(j.teamId, (conteo.get(j.teamId) ?? 0) + 1);
+    }
+    return conteo;
+  }, [datos.pool]);
+
   const filtrados = useMemo(() => {
     return datos.pool.filter((j) => {
       if (posicion !== "TODOS" && j.posicionCodigo !== posicion) return false;
       if (club !== "TODOS" && j.club !== club) return false;
       if (busqueda && !j.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false;
-      if (soloMiEquipo) return j.teamId === miTeamId;
+      if (equipoFiltro) return j.teamId === equipoFiltro;
       if (soloLibres && j.ocupado) return false;
       if (soloWishlist && !wishlist.has(j.id)) return false;
       return true;
     });
-  }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, soloMiEquipo, wishlist, miTeamId]);
+  }, [datos.pool, posicion, club, busqueda, soloLibres, soloWishlist, equipoFiltro, wishlist]);
 
   // Para ordenar por la columna ★: top favorito (🔥) primero, luego
   // favorito (★), luego el resto — números bajos = más arriba, así el
@@ -499,21 +510,18 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
     }
   }
 
-  function alternarMiEquipo() {
-    setSoloMiEquipo((v) => {
-      const activar = !v;
-      if (activar) {
-        // Al entrar en "Mi equipo" se parte de cero: el resto de filtros se
-        // quitan y los marca el usuario si le hace falta, en vez de heredar
-        // lo que tuviera puesto antes (p.ej. un club concreto) y liarla.
-        setPosicion("TODOS");
-        setClub("TODOS");
-        setBusqueda("");
-        setSoloLibres(false);
-        setSoloWishlist(false);
-      }
-      return activar;
-    });
+  function seleccionarEquipoFiltro(teamId) {
+    setEquipoFiltro(teamId);
+    if (teamId) {
+      // Al elegir una plantilla se parte de cero: el resto de filtros se
+      // quitan y los marca el usuario si le hace falta, en vez de heredar
+      // lo que tuviera puesto antes (p.ej. un club concreto) y liarla.
+      setPosicion("TODOS");
+      setClub("TODOS");
+      setBusqueda("");
+      setSoloLibres(false);
+      setSoloWishlist(false);
+    }
   }
 
   const grupos =
@@ -637,9 +645,20 @@ export default function DraftBoard({ inicial, miTeamId, wishlistInicial }) {
         <ChipFiltro activo={soloWishlist} onClick={() => setSoloWishlist((v) => !v)}>
           ★ Wishlist
         </ChipFiltro>
-        <ChipFiltro activo={soloMiEquipo} onClick={alternarMiEquipo}>
-          👕 Mi equipo ({misJugadores.length})
-        </ChipFiltro>
+        <select
+          value={equipoFiltro}
+          onChange={(e) => seleccionarEquipoFiltro(e.target.value)}
+          className="w-36 shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-neon-green"
+        >
+          <option value="">👕 Ver plantilla</option>
+          {[...datos.equipos]
+            .sort((a, b) => (a.id === miTeamId ? -1 : b.id === miTeamId ? 1 : a.name.localeCompare(b.name, "es")))
+            .map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.id === miTeamId ? "Mi equipo" : e.name} ({jugadoresPorEquipo.get(e.id) ?? 0})
+              </option>
+            ))}
+        </select>
       </div>
 
       {vista === "club" && (
