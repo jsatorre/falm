@@ -88,9 +88,13 @@ function picksPorEquipo(datos) {
     if (!porEquipo.has(p.teamId)) porEquipo.set(p.teamId, []);
     porEquipo.get(p.teamId).push({ nombre: p.playerName, club: p.playerClub });
   }
-  return datos.equipos
-    .map((e) => ({ equipo: e, jugadores: porEquipo.get(e.id) ?? [] }))
-    .sort((a, b) => b.jugadores.length - a.jugadores.length);
+  // Mismo orden del sorteo (datos.teamOrder) en vez de por nº de
+  // jugadores — con el draft terminado todos tienen los mismos, así que
+  // ese criterio dejaba un orden casi arbitrario que no era el del turno.
+  const ordenTeamId = datos.teamOrder.length > 0 ? datos.teamOrder : datos.equipos.map((e) => e.id);
+  return ordenTeamId
+    .map((teamId) => ({ equipo: datos.equipos.find((e) => e.id === teamId), jugadores: porEquipo.get(teamId) ?? [] }))
+    .filter((g) => g.equipo);
 }
 
 // Ataque -> portero, como en la chuleta de referencia (una tabla en la
