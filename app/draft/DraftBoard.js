@@ -81,12 +81,12 @@ function proximosTurnos(datos, cantidad) {
  */
 function picksPorEquipo(datos) {
   const porEquipo = new Map(); // teamId -> jugadores[]
+  // datos.picks ya viene ordenado por pick_index (orden real en que se
+  // fichó cada uno) — no se reordena, así cada equipo queda en el mismo
+  // orden en que fue fichando, no alfabético.
   for (const p of datos.picks) {
     if (!porEquipo.has(p.teamId)) porEquipo.set(p.teamId, []);
     porEquipo.get(p.teamId).push({ nombre: p.playerName, club: p.playerClub });
-  }
-  for (const jugadores of porEquipo.values()) {
-    jugadores.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }
   return datos.equipos
     .map((e) => ({ equipo: e, jugadores: porEquipo.get(e.id) ?? [] }))
@@ -324,8 +324,9 @@ function ResumenDraft({ datos }) {
             ) : (
               <ul className="divide-y divide-border/60 text-sm">
                 {jugadores.map((j, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5">
-                    <span>{j.nombre}</span>
+                  <li key={i} className="flex items-center gap-2 px-3 py-1.5">
+                    <span className="w-6 shrink-0 text-xs text-muted">R{i + 1}</span>
+                    <span className="flex-1 truncate">{j.nombre}</span>
                     <span className="shrink-0 text-xs text-muted">{j.club}</span>
                   </li>
                 ))}
