@@ -62,14 +62,20 @@ async function main() {
   }
 
   console.log("Creando todas las jornadas de la temporada...");
+  // El número de jornada sale de `short` (p.ej. "J4" -> 4), NUNCA de la
+  // posición en el array — Biwenger no garantiza que `rounds` venga
+  // ordenado por jornada real (en una temporada real J6 apareció antes que
+  // J4/J5 en la lista), y usar el índice del array desalineó 3 jornadas
+  // enteras (resultados/estado de una jornada aplicándose a otra).
   const roundsInsertados = [];
-  for (const [i, r] of rounds.entries()) {
+  for (const r of rounds) {
+    const jornada = parseInt(r.short.replace(/\D/g, ""), 10);
     const { data: round, error } = await supabase
       .from("rounds")
       .insert({
         season_id: season.id,
         biwenger_round_id: String(r.id),
-        jornada: i + 1,
+        jornada,
         status: r.status === "finished" ? "finished" : "pending",
       })
       .select()
