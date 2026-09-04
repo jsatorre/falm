@@ -5,7 +5,7 @@ import {
   getLeagueScoreId,
   fotoJugadorUrl,
 } from "./integrations/biwenger";
-import { supabase } from "./supabaseServer";
+import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
 
 const POSICION = {
   1: { codigo: "PT", nombre: "Portero" },
@@ -16,21 +16,23 @@ const POSICION = {
 
 /**
  * IDs de jornada de Biwenger (biwenger_round_id) que cuentan para vuestra
- * liga cara a cara — exactamente las jornadas de Liga que tienen un
- * enfrentamiento asignado (las mismas que usa la Clasificación). Ni la
- * pretemporada de fichajes ni una jornada que hayáis aplazado desde
- * /admin (ver aplazar-jornada) cuentan para ninguna estadística de
- * Equipo — es el mismo criterio en toda la app.
+ * liga cara a cara — las jornadas de Liga con enfrentamiento asignado
+ * HASTA la que le toca ahora mismo al calendario (incluida), en su orden
+ * natural. No basta con que Biwenger ya la marque "finished": un partido
+ * adelantado de una jornada posterior (p.ej. la 6 jugándose antes que la 4
+ * o la 5) no debe contar todavía — se cuenta junto con el resto de esa
+ * misma jornada cuando le llegue el turno en el calendario cara a cara.
+ * Ni la pretemporada de fichajes ni una jornada aplazada desde /admin
+ * cuentan para ninguna estadística de Equipo — mismo criterio que
+ * Clasificación/En directo.
  */
 async function getJornadasLigaEnJuego() {
-  const [{ data: fixtureRoundIds }, { data: rounds }] = await Promise.all([
-    supabase.from("fixtures").select("round_id"),
-    supabase.from("rounds").select("id, biwenger_round_id"),
-  ]);
+  const rounds = await getCaraACaraRounds();
+  const actual = elegirRondaEnDirecto(rounds);
+  if (!actual) return new Set();
 
-  const roundIdsConFixture = new Set(fixtureRoundIds.map((f) => f.round_id));
   return new Set(
-    rounds.filter((r) => roundIdsConFixture.has(r.id)).map((r) => String(r.biwenger_round_id))
+    rounds.filter((r) => r.jornada <= actual.jornada).map((r) => String(r.biwenger_round_id))
   );
 }
 

@@ -20,7 +20,7 @@ export async function getCaraACaraRounds() {
 
   const { data: rounds, error: roundsError } = await supabase
     .from("rounds")
-    .select("id, jornada, status, fichajes_deadline")
+    .select("id, jornada, status, fichajes_deadline, biwenger_round_id")
     .in("id", roundIds)
     .order("jornada", { ascending: true });
   if (roundsError) throw roundsError;
