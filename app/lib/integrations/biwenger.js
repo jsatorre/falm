@@ -114,8 +114,20 @@ export async function getTeamLineups(biwengerTeamId) {
  * cada ciclo corto.
  */
 export async function getHistoricalRoundPoints(teamIds) {
+  // Un solo equipo con un biwenger_user_id inválido (p.ej. un equipo de
+  // prueba mal borrado) no debe tumbar la sincronización de TODA la liga
+  // real — confirmado que pasaba: Promise.all sin capturar por equipo
+  // hacía que un único 404 abortara todo, dejando "En directo" congelado
+  // indefinidamente sin que nadie se enterara del motivo real.
   const porEquipo = await Promise.all(
-    teamIds.map(async (teamId) => ({ teamId, lineups: await getTeamLineups(teamId) }))
+    teamIds.map(async (teamId) => {
+      try {
+        return { teamId, lineups: await getTeamLineups(teamId) };
+      } catch (err) {
+        console.warn(`No se han podido traer las jornadas cerradas del equipo ${teamId}:`, err);
+        return { teamId, lineups: [] };
+      }
+    })
   );
 
   const resultado = {}; // roundId -> teamId -> points
