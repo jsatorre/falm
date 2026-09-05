@@ -138,9 +138,12 @@ export async function getHistoricalRoundPoints(teamIds) {
  * que ya usa "Equipo" (ver puntosPartido). El once de cada equipo sale de
  * getOncesEnVivoLiga (1 sola llamada a tu cuenta para los 12 equipos).
  *
- * Devuelve un Map teamId -> puntos, o null si Biwenger no considera esta
- * ronda como la activa ahora mismo (mejor no calcular nada que calcularlo
- * mal con el once de otra jornada).
+ * Devuelve un Map teamId -> { total, jugadores }, donde `jugadores` es la
+ * lista de titulares que YA tienen datos de su partido (ya jugado o en
+ * juego), con nombre y puntos — para poder enseñar quién está puntuando
+ * ahora mismo sin gastar ni una llamada de más, es la misma ficha pública
+ * que ya se pedía para sumar el total. O null si Biwenger no considera
+ * esta ronda como la activa ahora mismo.
  */
 export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const oncesPorEquipo = await getOncesEnVivoLiga(biwengerRoundIdEnVivo);
@@ -157,13 +160,17 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const resultado = new Map();
   for (const [teamId, titulares] of oncesPorEquipo) {
     let total = 0;
+    const jugadores = [];
     for (const playerId of titulares) {
-      const report = fichaPorId
-        .get(playerId)
-        ?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
-      if (report) total += puntosPartido(report, scoreId);
+      const ficha = fichaPorId.get(playerId);
+      const report = ficha?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
+      if (!report) continue; // todavía no ha jugado su partido esta ronda
+      const puntos = puntosPartido(report, scoreId);
+      total += puntos;
+      jugadores.push({ id: playerId, nombre: ficha.name, puntos });
     }
-    resultado.set(teamId, total);
+    jugadores.sort((a, b) => b.puntos - a.puntos);
+    resultado.set(teamId, { total, jugadores });
   }
   return resultado;
 }

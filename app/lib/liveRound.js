@@ -29,7 +29,7 @@ export async function getRondaEnDirecto() {
     { data: trophies },
   ] = await Promise.all([
     supabase.from("fixtures").select("team_a_id, team_b_id").eq("round_id", ronda.id),
-    supabase.from("round_results").select("team_id, biwenger_points").eq("round_id", ronda.id),
+    supabase.from("round_results").select("team_id, biwenger_points, jugadores_en_vivo").eq("round_id", ronda.id),
     supabase.from("teams").select("id, name, crest_url"),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
     supabase.from("round_results").select("round_id, team_id, biwenger_points"),
@@ -38,6 +38,7 @@ export async function getRondaEnDirecto() {
 
   const equipoPorId = Object.fromEntries(teams.map((t) => [t.id, t]));
   const puntosPorEquipo = Object.fromEntries(resultsRonda.map((r) => [r.team_id, r.biwenger_points]));
+  const jugadoresPorEquipo = Object.fromEntries(resultsRonda.map((r) => [r.team_id, r.jugadores_en_vivo]));
 
   const fixtures = fixturesRonda.map((f) => ({
     teamAId: f.team_a_id,
@@ -46,6 +47,8 @@ export async function getRondaEnDirecto() {
     teamB: equipoPorId[f.team_b_id],
     pointsA: puntosPorEquipo[f.team_a_id] ?? null,
     pointsB: puntosPorEquipo[f.team_b_id] ?? null,
+    jugadoresA: jugadoresPorEquipo[f.team_a_id] ?? null,
+    jugadoresB: jugadoresPorEquipo[f.team_b_id] ?? null,
   }));
 
   marcarPartidoDestacado(fixtures, ronda, rounds, teams, todosFixturesRaw, todosResultsRaw, trophies);

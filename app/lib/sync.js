@@ -110,12 +110,13 @@ export async function syncBiwengerResults() {
   // upsert (eso sí revienta, Postgres no admite tocar la misma fila dos
   // veces en un solo ON CONFLICT).
   const filasPorClave = new Map();
-  function anotarFila(roundId, teamId, puntos) {
+  function anotarFila(roundId, teamId, puntos, jugadoresEnVivo = null) {
     if (puntos == null) return;
     filasPorClave.set(`${roundId}:${teamId}`, {
       round_id: roundId,
       team_id: teamId,
       biwenger_points: puntos,
+      jugadores_en_vivo: jugadoresEnVivo,
       synced_at: new Date().toISOString(),
     });
   }
@@ -125,6 +126,9 @@ export async function syncBiwengerResults() {
     if (!roundId) continue; // jornada de Biwenger fuera de nuestro calendario (p.ej. de otra fase)
 
     for (const team of teams) {
+      // Sin desglose por jugador para el histórico ya cerrado (jugadores_en_vivo
+      // a null) — así no se queda un desglose obsoleto de cuando esta
+      // ronda todavía era "la de en directo".
       anotarFila(roundId, team.id, puntosPorEquipoBiwenger[team.biwenger_user_id]);
     }
   }
@@ -144,7 +148,8 @@ export async function syncBiwengerResults() {
 
     if (roundId && puntosEnVivo) {
       for (const team of teams) {
-        anotarFila(roundId, team.id, puntosEnVivo.get(String(team.biwenger_user_id)));
+        const datos = puntosEnVivo.get(String(team.biwenger_user_id));
+        anotarFila(roundId, team.id, datos?.total, datos?.jugadores ?? null);
       }
     }
   }

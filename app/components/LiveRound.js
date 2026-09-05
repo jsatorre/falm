@@ -109,6 +109,7 @@ export default function LiveRound({ inicial }) {
                 <EquipoEnDirecto
                   equipo={f.teamA}
                   puntos={f.pointsA}
+                  jugadores={f.jugadoresA}
                   ganando={puntosA != null && puntosA > puntosB}
                   align="right"
                   grande={f.destacado}
@@ -124,6 +125,7 @@ export default function LiveRound({ inicial }) {
                 <EquipoEnDirecto
                   equipo={f.teamB}
                   puntos={f.pointsB}
+                  jugadores={f.jugadoresB}
                   ganando={puntosB != null && puntosB > puntosA}
                   align="left"
                   grande={f.destacado}
@@ -137,7 +139,7 @@ export default function LiveRound({ inicial }) {
   );
 }
 
-function EquipoEnDirecto({ equipo, puntos, ganando, align, grande }) {
+function EquipoEnDirecto({ equipo, puntos, jugadores, ganando, align, grande }) {
   const derecha = align === "right";
   return (
     <div className={`flex items-center gap-2.5 ${derecha ? "flex-row-reverse text-right" : "text-left"}`}>
@@ -156,6 +158,15 @@ function EquipoEnDirecto({ equipo, puntos, ganando, align, grande }) {
         >
           {puntos ?? "—"}
         </span>
+        {jugadores?.length > 0 && (
+          <div className={`mt-1 flex flex-col gap-0.5 ${derecha ? "items-end" : "items-start"}`}>
+            {jugadores.map((j) => (
+              <span key={j.id} className="text-[10px] text-muted">
+                {j.nombre} <span className={j.puntos > 0 ? "text-neon-green" : "text-muted"}>{j.puntos}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
