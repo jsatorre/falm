@@ -1,6 +1,22 @@
 import { supabase } from "./supabaseServer";
-import { getAllTeamsRoundPoints, getSeasonData, getLeagueScoreId } from "./integrations/biwenger";
+import { getHistoricalRoundPoints, getLiveRoundPoints, getSeasonData, getLeagueScoreId } from "./integrations/biwenger";
 import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
+
+// El histórico de jornadas ya cerradas (12 llamadas a tu cuenta) casi
+// nunca cambia una vez cerrada la jornada — repetirlo cada 60s como la
+// ronda en directo sería tirar peticiones a la basura. Con refrescarlo
+// cada 20 min sobra para pillar el número oficial de Biwenger si alguna
+// vez lo corrige a posteriori.
+const HISTORICO_CACHE_MS = 20 * 60 * 1000;
+let historicoCache = null; // { ts, promise }
+
+function getHistoricoCacheado(teamIds) {
+  const ahora = Date.now();
+  if (!historicoCache || ahora - historicoCache.ts > HISTORICO_CACHE_MS) {
+    historicoCache = { ts: ahora, promise: getHistoricalRoundPoints(teamIds) };
+  }
+  return historicoCache.promise;
+}
 
 /**
  * El estado de cada jornada (pendiente/cerrada) viene del calendario
@@ -46,13 +62,19 @@ async function syncEstadosDeJornada(seasonRounds) {
 
 /**
  * Trae de Biwenger los puntos de TODAS las jornadas para TODOS los
- * equipos (12 llamadas en paralelo a tu cuenta personal) y los vuelca en
- * `round_results`, y de paso refresca qué jornadas ha cerrado ya Biwenger.
+ * equipos y los vuelca en `round_results`, y de paso refresca qué
+ * jornadas ha cerrado ya Biwenger. Dos fuentes distintas, cada una con su
+ * propio ritmo:
+ * - Histórico de jornadas ya cerradas: 12 llamadas a tu cuenta, pero con
+ *   caché de 20 min (ver getHistoricoCacheado) — casi nunca cambia.
+ * - Jornada en directo: se recalcula cada vez que se llama a esto (1
+ *   llamada a tu cuenta + fichas públicas gratis) — es la única que de
+ *   verdad necesita frescura.
  *
  * El estado de las jornadas (pending/live/finished) se refresca SIEMPRE —
- * es una única llamada pública, gratis, no toca tu cuenta. Pero las 12
- * llamadas caras (los puntos de cada equipo) solo se hacen si Biwenger dice
- * que hay algún partido en juego ahora mismo (`activeEvents`): fuera de esas
+ * es una única llamada pública, gratis, no toca tu cuenta. Pero todo lo
+ * demás (histórico + en directo) solo se hace si Biwenger dice que hay
+ * algún partido en juego ahora mismo (`activeEvents`): fuera de esas
  * horas no hay puntos nuevos que traer, así que no tiene sentido gastar tu
  * cuota. Como la comprobación gratuita se hace en cada llamada, en cuanto
  * arranca un partido se detecta de inmediato — no hay ninguna ventana en la
@@ -75,38 +97,59 @@ export async function syncBiwengerResults() {
   if (roundsError) throw roundsError;
 
   const roundIdPorBiwengerId = new Map(rounds.map((r) => [String(r.biwenger_round_id), r.id]));
+  const teamIds = teams.map((t) => t.biwenger_user_id);
 
-  // La jornada "en directo" del calendario cara a cara: sus puntos no se
-  // fían del campo oficial de Biwenger (no lo rellena hasta cerrar la
-  // jornada ENTERA, aunque partidos sueltos ya hayan terminado) — se
-  // calculan en vivo sumando cada titular desde su ficha pública (ver
-  // getAllTeamsRoundPoints). El resto de rondas sigue usando el campo
-  // oficial, ya correcto una vez cerradas.
-  const caraACaraRounds = await getCaraACaraRounds();
-  const rondaEnDirecto = elegirRondaEnDirecto(caraACaraRounds);
-  const scoreId = rondaEnDirecto ? await getLeagueScoreId() : null;
+  // Histórico de jornadas ya cerradas — 12 llamadas, pero con su propia
+  // caché larga (ver getHistoricoCacheado), no se repiten en cada ciclo.
+  const puntosPorJornadaBiwenger = await getHistoricoCacheado(teamIds);
 
-  const puntosPorJornadaBiwenger = await getAllTeamsRoundPoints(teams.map((t) => t.biwenger_user_id), {
-    biwengerRoundIdEnVivo: rondaEnDirecto?.biwenger_round_id,
-    scoreId,
-  });
+  // Un Map por "round_id:team_id" en vez de un array — así, si alguna vez
+  // el histórico y el cálculo en vivo coincidieran en la misma ronda (no
+  // debería, pero mejor no arriesgarse), el segundo valor simplemente pisa
+  // al primero en vez de mandar la misma clave dos veces en el mismo
+  // upsert (eso sí revienta, Postgres no admite tocar la misma fila dos
+  // veces en un solo ON CONFLICT).
+  const filasPorClave = new Map();
+  function anotarFila(roundId, teamId, puntos) {
+    if (puntos == null) return;
+    filasPorClave.set(`${roundId}:${teamId}`, {
+      round_id: roundId,
+      team_id: teamId,
+      biwenger_points: puntos,
+      synced_at: new Date().toISOString(),
+    });
+  }
 
-  const filas = [];
   for (const [biwengerRoundId, puntosPorEquipoBiwenger] of Object.entries(puntosPorJornadaBiwenger)) {
     const roundId = roundIdPorBiwengerId.get(String(biwengerRoundId));
     if (!roundId) continue; // jornada de Biwenger fuera de nuestro calendario (p.ej. de otra fase)
 
     for (const team of teams) {
-      const puntos = puntosPorEquipoBiwenger[team.biwenger_user_id];
-      if (puntos == null) continue;
-      filas.push({
-        round_id: roundId,
-        team_id: team.id,
-        biwenger_points: puntos,
-        synced_at: new Date().toISOString(),
-      });
+      anotarFila(roundId, team.id, puntosPorEquipoBiwenger[team.biwenger_user_id]);
     }
   }
+
+  // La jornada "en directo" del calendario cara a cara: sus puntos no se
+  // fían del campo oficial de Biwenger (no lo rellena hasta cerrar la
+  // jornada ENTERA, aunque partidos sueltos ya hayan terminado) — se
+  // calculan en vivo cada ciclo (barato: 1 llamada a tu cuenta + fichas
+  // públicas gratis), pisando lo que traiga el histórico para esa ronda
+  // concreta (que ahí vendría vacío de todas formas mientras siga abierta).
+  const caraACaraRounds = await getCaraACaraRounds();
+  const rondaEnDirecto = elegirRondaEnDirecto(caraACaraRounds);
+  if (rondaEnDirecto) {
+    const roundId = roundIdPorBiwengerId.get(String(rondaEnDirecto.biwenger_round_id));
+    const scoreId = await getLeagueScoreId();
+    const puntosEnVivo = await getLiveRoundPoints(rondaEnDirecto.biwenger_round_id, scoreId);
+
+    if (roundId && puntosEnVivo) {
+      for (const team of teams) {
+        anotarFila(roundId, team.id, puntosEnVivo.get(String(team.biwenger_user_id)));
+      }
+    }
+  }
+
+  const filas = [...filasPorClave.values()];
 
   if (filas.length === 0) return { synced: 0 };
 

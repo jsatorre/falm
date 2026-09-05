@@ -71,11 +71,22 @@ export async function getLeagueStandings() {
  * El sistema de puntuación real que usa la liga (1 = Diario AS, 2 =
  * SofaScore, 3 = Estadísticas...) — cada jugador trae sus puntos
  * desglosados por sistema, hay que saber cuál es el nuestro para no coger
- * el de otro por error.
+ * el de otro por error. Es una configuración fija de la liga (no cambia
+ * de una sincronización a otra), así que se cachea un día entero en vez
+ * de preguntarlo cada vez — si alguna vez cambiáis el sistema de
+ * puntuación desde Biwenger, tardará como mucho un día en notarse.
  */
+let scoreIdCache = null; // { ts, valor }
+const SCORE_ID_CACHE_MS = 24 * 60 * 60 * 1000;
+
 export async function getLeagueScoreId() {
+  const ahora = Date.now();
+  if (scoreIdCache && ahora - scoreIdCache.ts < SCORE_ID_CACHE_MS) {
+    return scoreIdCache.valor;
+  }
   const leagueId = process.env.BIWENGER_LEAGUE_ID;
   const data = await biwengerFetch(`/league/${leagueId}?fields=id,scoreID`);
+  scoreIdCache = { ts: ahora, valor: data.scoreID };
   return data.scoreID;
 }
 
@@ -92,22 +103,17 @@ export async function getTeamLineups(biwengerTeamId) {
 
 /**
  * Puntos de jornada de TODOS los equipos de la liga, indexados por
- * biwengerRoundId -> biwengerTeamId -> puntos. Una llamada por equipo (12
- * llamadas), en paralelo — pero OJO: `lineups` (así, en plural y sin
- * filtro) solo trae las rondas que Biwenger ya ha cerrado del todo, no la
- * que está en juego ahora mismo, aunque ya hayan terminado partidos
- * sueltos de esa jornada.
+ * biwengerRoundId -> biwengerTeamId -> puntos — SOLO de las jornadas que
+ * Biwenger ya ha cerrado del todo (no de la que está en juego ahora
+ * mismo, para eso ver getLiveRoundPoints). Una llamada por equipo (12
+ * llamadas a tu cuenta), en paralelo.
  *
- * Si se pasa `opciones.biwengerRoundIdEnVivo`, para ESA ronda concreta no
- * se usa ese campo (vendría vacío) — se calcula en vivo con
- * getOncesEnVivoLiga (ver esa función), sumando los puntos de cada
- * titular desde su ficha pública. Así si un partido de esa jornada ya ha
- * terminado, sus puntos cuentan ya, sin esperar a que Biwenger cierre la
- * jornada entera.
+ * Esto casi nunca cambia una vez cerrada una jornada, así que quien llame
+ * a esto (ver sync.js) puede — y debe — cachearlo con un margen mucho más
+ * largo que la ronda en directo, en vez de repetir estas 12 llamadas en
+ * cada ciclo corto.
  */
-export async function getAllTeamsRoundPoints(teamIds, opciones = {}) {
-  const { biwengerRoundIdEnVivo, scoreId } = opciones;
-
+export async function getHistoricalRoundPoints(teamIds) {
   const porEquipo = await Promise.all(
     teamIds.map(async (teamId) => ({ teamId, lineups: await getTeamLineups(teamId) }))
   );
@@ -120,32 +126,45 @@ export async function getAllTeamsRoundPoints(teamIds, opciones = {}) {
       resultado[roundId][teamId] = lineup.points;
     }
   }
+  return resultado;
+}
 
-  if (biwengerRoundIdEnVivo != null) {
-    const oncesPorEquipo = await getOncesEnVivoLiga(biwengerRoundIdEnVivo);
-    if (oncesPorEquipo) {
-      const idsUnicos = new Set();
-      oncesPorEquipo.forEach((titulares) => titulares.forEach((id) => idsUnicos.add(id)));
+/**
+ * Puntos EN VIVO de todos los equipos para la ronda que está en juego
+ * ahora mismo — no se fía del campo oficial de Biwenger (no lo rellena
+ * hasta cerrar la jornada ENTERA, aunque partidos sueltos ya hayan
+ * terminado): se calcula sumando los puntos de cada titular desde su
+ * ficha pública (gratis, sin límite de tu cuenta), con la misma fórmula
+ * que ya usa "Equipo" (ver puntosPartido). El once de cada equipo sale de
+ * getOncesEnVivoLiga (1 sola llamada a tu cuenta para los 12 equipos).
+ *
+ * Devuelve un Map teamId -> puntos, o null si Biwenger no considera esta
+ * ronda como la activa ahora mismo (mejor no calcular nada que calcularlo
+ * mal con el once de otra jornada).
+ */
+export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
+  const oncesPorEquipo = await getOncesEnVivoLiga(biwengerRoundIdEnVivo);
+  if (!oncesPorEquipo) return null;
 
-      const fichas = await Promise.all(
-        [...idsUnicos].map(async (id) => [id, await getFichaJugador(id).catch(() => null)])
-      );
-      const fichaPorId = new Map(fichas);
+  const idsUnicos = new Set();
+  oncesPorEquipo.forEach((titulares) => titulares.forEach((id) => idsUnicos.add(id)));
 
-      resultado[biwengerRoundIdEnVivo] ??= {};
-      for (const [teamId, titulares] of oncesPorEquipo) {
-        let total = 0;
-        for (const playerId of titulares) {
-          const report = fichaPorId
-            .get(playerId)
-            ?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
-          if (report) total += puntosPartido(report, scoreId);
-        }
-        resultado[biwengerRoundIdEnVivo][teamId] = total;
-      }
+  const fichas = await Promise.all(
+    [...idsUnicos].map(async (id) => [id, await getFichaJugador(id).catch(() => null)])
+  );
+  const fichaPorId = new Map(fichas);
+
+  const resultado = new Map();
+  for (const [teamId, titulares] of oncesPorEquipo) {
+    let total = 0;
+    for (const playerId of titulares) {
+      const report = fichaPorId
+        .get(playerId)
+        ?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
+      if (report) total += puntosPartido(report, scoreId);
     }
+    resultado.set(teamId, total);
   }
-
   return resultado;
 }
 
