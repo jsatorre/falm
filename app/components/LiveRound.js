@@ -79,7 +79,12 @@ export default function LiveRound({ inicial }) {
 
       <div className="flex flex-col gap-3">
         {datos.fixtures.map((f) => {
-          const jugando = f.pointsA == null || f.pointsB == null;
+          // Antes se miraba si pointsA/pointsB venían sin datos (null) para
+          // saber si el partido seguía "jugando" — pero ahora la jornada en
+          // directo siempre trae un número (0 incluido, para quien todavía
+          // no ha puntuado), así que un 0 ya no distingue "sin jugar" de
+          // "cerrado con 0 puntos". Se usa el estado real de la jornada.
+          const jugando = datos.status !== "finished";
           const puntosA =
             f.pointsA != null && f.pointsB != null
               ? calcularPuntosEnfrentamiento(f.pointsA, f.pointsB)
