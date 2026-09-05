@@ -210,6 +210,8 @@ export function puntosPartido(report, scoreId) {
   const directo = report.points?.[String(scoreId)];
   if (directo != null) return directo;
 
+  // Las tarjetas ya van incluidas dentro de "Estadísticas" (score3) —
+  // no se restan aparte, sería contarlas dos veces.
   const stats = report.rawStats ?? {};
   return (stats.score3 ?? 0) + (stats.mvp ? 1 : 0) + (stats.win ? 1 : 0);
 }
@@ -248,8 +250,15 @@ export async function getAlineacionesPorJornada(biwengerTeamId) {
  * público, sin login.
  */
 export async function getFichaJugador(playerId) {
+  // El CDN de Cloudflare cachea esta URL por su cuenta durante HORAS
+  // (confirmado: una respuesta con "Age: 7326" — más de 2h vieja — no
+  // tenía todavía el partido de un jugador que llevaba toda la segunda
+  // parte jugado). `cache: "no-store"` evita que Next.js la cachee por su
+  // lado, pero no basta para saltarse el caché de Cloudflare — hace falta
+  // que la URL sea distinta cada vez, de ahí el parámetro `_`.
   const res = await fetch(
-    `https://cf.biwenger.com/api/v2/players/la-liga/${playerId}?fields=*,team,fitness,reports,competition&score=3&lang=es`
+    `https://cf.biwenger.com/api/v2/players/la-liga/${playerId}?fields=*,team,fitness,reports,competition&score=3&lang=es&_=${Date.now()}`,
+    { cache: "no-store" }
   );
   if (!res.ok) throw new Error(`Biwenger player ${playerId} -> ${res.status}`);
   const { data } = await res.json();
