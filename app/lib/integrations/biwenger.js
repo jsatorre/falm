@@ -99,13 +99,11 @@ export async function getTeamLineups(biwengerTeamId) {
  * sueltos de esa jornada.
  *
  * Si se pasa `opciones.biwengerRoundIdEnVivo`, para ESA ronda concreta no
- * se usa ese campo (vendría vacío) — se calcula en vivo: se pide el once
- * titular de cada equipo para esa ronda (`lineup` en singular + `round=`,
- * 12 llamadas más a tu cuenta) y se suman los puntos de cada titular desde
- * su ficha pública (gratis, sin límite de tu cuenta), con la misma fórmula
- * que ya usa "Equipo" (ver puntosPartido). Así si un partido de esa
- * jornada ya ha terminado, sus puntos cuentan ya, sin esperar a que
- * Biwenger cierre la jornada entera.
+ * se usa ese campo (vendría vacío) — se calcula en vivo con
+ * getOncesEnVivoLiga (ver esa función), sumando los puntos de cada
+ * titular desde su ficha pública. Así si un partido de esa jornada ya ha
+ * terminado, sus puntos cuentan ya, sin esperar a que Biwenger cierre la
+ * jornada entera.
  */
 export async function getAllTeamsRoundPoints(teamIds, opciones = {}) {
   const { biwengerRoundIdEnVivo, scoreId } = opciones;
@@ -124,35 +122,53 @@ export async function getAllTeamsRoundPoints(teamIds, opciones = {}) {
   }
 
   if (biwengerRoundIdEnVivo != null) {
-    const titularesPorEquipo = await Promise.all(
-      teamIds.map(async (teamId) => {
-        const data = await biwengerFetch(`/user/${teamId}?fields=id,name,lineup&round=${biwengerRoundIdEnVivo}`);
-        return { teamId, titulares: (data.lineup?.playersID ?? []).filter((id) => id != null) };
-      })
-    );
+    const oncesPorEquipo = await getOncesEnVivoLiga(biwengerRoundIdEnVivo);
+    if (oncesPorEquipo) {
+      const idsUnicos = new Set();
+      oncesPorEquipo.forEach((titulares) => titulares.forEach((id) => idsUnicos.add(id)));
 
-    const idsUnicos = new Set();
-    titularesPorEquipo.forEach(({ titulares }) => titulares.forEach((id) => idsUnicos.add(id)));
+      const fichas = await Promise.all(
+        [...idsUnicos].map(async (id) => [id, await getFichaJugador(id).catch(() => null)])
+      );
+      const fichaPorId = new Map(fichas);
 
-    const fichas = await Promise.all(
-      [...idsUnicos].map(async (id) => [id, await getFichaJugador(id).catch(() => null)])
-    );
-    const fichaPorId = new Map(fichas);
-
-    resultado[biwengerRoundIdEnVivo] ??= {};
-    for (const { teamId, titulares } of titularesPorEquipo) {
-      let total = 0;
-      for (const playerId of titulares) {
-        const report = fichaPorId
-          .get(playerId)
-          ?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
-        if (report) total += puntosPartido(report, scoreId);
+      resultado[biwengerRoundIdEnVivo] ??= {};
+      for (const [teamId, titulares] of oncesPorEquipo) {
+        let total = 0;
+        for (const playerId of titulares) {
+          const report = fichaPorId
+            .get(playerId)
+            ?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
+          if (report) total += puntosPartido(report, scoreId);
+        }
+        resultado[biwengerRoundIdEnVivo][teamId] = total;
       }
-      resultado[biwengerRoundIdEnVivo][teamId] = total;
     }
   }
 
   return resultado;
+}
+
+/**
+ * El once titular de TODOS los equipos de la liga para la ronda que
+ * Biwenger considera activa AHORA MISMO — una sola llamada a tu cuenta
+ * (/rounds/league), a diferencia de /user/{id}?...lineup&round=X, que solo
+ * deja ver el once del equipo propio (confirmado probando con otro equipo
+ * de la liga: viene vacío incluso siendo tú el dueño de la liga). Devuelve
+ * null si la ronda activa según Biwenger no coincide con la que se pide
+ * (p.ej. por un desfase puntual) — mejor no calcular nada que calcularlo
+ * mal con el once de otra jornada.
+ */
+async function getOncesEnVivoLiga(biwengerRoundIdEnVivo) {
+  const data = await biwengerFetch("/rounds/league");
+  if (String(data.round?.id) !== String(biwengerRoundIdEnVivo)) return null;
+
+  return new Map(
+    (data.league?.standings ?? []).map((s) => [
+      String(s.id),
+      (s.lineup?.players ?? []).filter((id) => id != null),
+    ])
+  );
 }
 
 /**
