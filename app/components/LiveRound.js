@@ -3,15 +3,16 @@
 import { useEffect, useState } from "react";
 import { calcularPuntosEnfrentamiento } from "../lib/scoring";
 
-// Cada sync son 12 llamadas a Biwenger en paralelo (una por equipo) — nada
-// de dejarlo con un poll corto y automático. El servidor comparte un mismo
-// caché de 60s entre todos (ver app/lib/sync.js), así que ese es también
-// el cooldown real del botón: da igual quién lo pulse, en esa ventana solo
-// se dispara una sincronización real. El auto cada 15 min es solo para que
-// la pantalla no se quede congelada del todo si alguien la deja abierta
-// sin tocar nada.
+// El servidor comparte un mismo caché de 60s entre todos (ver
+// app/lib/sync.js): da igual cuánta gente tenga la pantalla abierta a la
+// vez o cuántas pestañas hagan este auto-refresco, en esa ventana de 60s
+// solo se dispara una sincronización real — el resto sirven de la misma
+// caché. Por eso el auto-refresco puede ir también a 60s (antes eran 15
+// min, de cuando la ronda en directo costaba 12 llamadas caras en cada
+// sync; ahora solo cuesta 1 + fichas públicas gratis, ver getLiveRoundPoints)
+// sin que suponga ninguna llamada de más a tu cuenta.
 const COOLDOWN_MS = 60000;
-const AUTO_MS = 15 * 60000;
+const AUTO_MS = 60000;
 
 export default function LiveRound({ inicial }) {
   const [datos, setDatos] = useState(inicial);
