@@ -274,7 +274,13 @@ export async function getFichaJugador(playerId) {
  * con partidos, activeEvents simplemente viene vacío por sí solo.
  */
 export async function getSeasonData() {
-  const res = await fetch("https://cf.biwenger.com/api/v2/competitions/la-liga/data?lang=es");
+  // Mismo problema de caché de Cloudflare que getFichaJugador — sin el
+  // cache-busting, activeEvents puede quedarse con una copia de hace
+  // horas, y si esa copia venía vacía, ni siquiera se intenta sincronizar
+  // nada nuevo aunque haya partidos en juego de verdad.
+  const res = await fetch(`https://cf.biwenger.com/api/v2/competitions/la-liga/data?lang=es&_=${Date.now()}`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error(`Biwenger competition data -> ${res.status}`);
   const { data } = await res.json();
   return {
