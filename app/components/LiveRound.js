@@ -160,7 +160,7 @@ function EquipoEnDirecto({ equipo, puntos, jugadores, ganando, align, grande }) 
         </span>
         {jugadores != null && (
           <span className="mt-0.5 text-[10px] text-muted">
-            {jugadores.length} {jugadores.length === 1 ? "jugador" : "jugadores"} puntuando
+            {jugadores.length} {jugadores.length === 1 ? "jugador" : "jugadores"}
           </span>
         )}
       </div>
