@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseServer";
-import { getAllTeamsRoundPoints, getSeasonData } from "./integrations/biwenger";
+import { getAllTeamsRoundPoints, getSeasonData, getLeagueScoreId } from "./integrations/biwenger";
+import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
 
 /**
  * El estado de cada jornada (pendiente/cerrada) viene del calendario
@@ -75,7 +76,20 @@ export async function syncBiwengerResults() {
 
   const roundIdPorBiwengerId = new Map(rounds.map((r) => [String(r.biwenger_round_id), r.id]));
 
-  const puntosPorJornadaBiwenger = await getAllTeamsRoundPoints(teams.map((t) => t.biwenger_user_id));
+  // La jornada "en directo" del calendario cara a cara: sus puntos no se
+  // fían del campo oficial de Biwenger (no lo rellena hasta cerrar la
+  // jornada ENTERA, aunque partidos sueltos ya hayan terminado) — se
+  // calculan en vivo sumando cada titular desde su ficha pública (ver
+  // getAllTeamsRoundPoints). El resto de rondas sigue usando el campo
+  // oficial, ya correcto una vez cerradas.
+  const caraACaraRounds = await getCaraACaraRounds();
+  const rondaEnDirecto = elegirRondaEnDirecto(caraACaraRounds);
+  const scoreId = rondaEnDirecto ? await getLeagueScoreId() : null;
+
+  const puntosPorJornadaBiwenger = await getAllTeamsRoundPoints(teams.map((t) => t.biwenger_user_id), {
+    biwengerRoundIdEnVivo: rondaEnDirecto?.biwenger_round_id,
+    scoreId,
+  });
 
   const filas = [];
   for (const [biwengerRoundId, puntosPorEquipoBiwenger] of Object.entries(puntosPorJornadaBiwenger)) {

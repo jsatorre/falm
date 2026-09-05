@@ -4,6 +4,7 @@ import {
   getFichaJugador,
   getLeagueScoreId,
   fotoJugadorUrl,
+  puntosPartido,
 } from "./integrations/biwenger";
 import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
 
@@ -61,20 +62,6 @@ export async function calcularEstadisticasEquipo(biwengerTeamId) {
   );
 }
 
-// Vuestra liga usa un sistema de puntuación "Personalizado" (scoreID 100 en
-// Biwenger), que NO viene precalculado dentro de report.points (ese dict
-// solo trae los sistemas estándar: 1 AS, 2 SofaScore, 3 Estadísticas...).
-// Confirmado en el propio panel de Biwenger: Puntos Estadísticas (= score3
-// de rawStats) + MVP*1 + Victoria*1. Si algún día cambiáis la fórmula desde
-// Biwenger, esta función hay que actualizarla a mano.
-function puntosSegunLiga(report, scoreId) {
-  const directo = report.points?.[String(scoreId)];
-  if (directo != null) return directo;
-
-  const stats = report.rawStats ?? {};
-  return (stats.score3 ?? 0) + (stats.mvp ? 1 : 0) + (stats.win ? 1 : 0);
-}
-
 function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, jornadasEnJuego) {
   const todosLosReports = ficha.reports ?? [];
   const reports = todosLosReports.filter((r) => jornadasEnJuego.has(String(r.match?.round?.id)));
@@ -105,7 +92,7 @@ function construirEstadisticasJugador(ficha, ownership, alineaciones, scoreId, j
     const fechaPartido = r.match?.date ?? 0;
     if (fechaPartido >= fechaFichaje) {
       jornadasEnEquipo += 1;
-      const puntosRonda = puntosSegunLiga(r, scoreId);
+      const puntosRonda = puntosPartido(r, scoreId);
       const titulares = titularesPorRonda.get(r.match?.round?.id) ?? [];
       if (titulares.includes(ficha.id)) {
         puntosAprovechados += puntosRonda;
