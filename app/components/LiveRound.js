@@ -158,14 +158,10 @@ function EquipoEnDirecto({ equipo, puntos, jugadores, ganando, align, grande }) 
         >
           {puntos ?? "—"}
         </span>
-        {jugadores?.length > 0 && (
-          <div className={`mt-1 flex flex-col gap-0.5 ${derecha ? "items-end" : "items-start"}`}>
-            {jugadores.map((j) => (
-              <span key={j.id} className="text-[10px] text-muted">
-                {j.nombre} <span className={j.puntos > 0 ? "text-neon-green" : "text-muted"}>{j.puntos}</span>
-              </span>
-            ))}
-          </div>
+        {jugadores != null && (
+          <span className="mt-0.5 text-[10px] text-muted">
+            {jugadores.length} {jugadores.length === 1 ? "jugador" : "jugadores"} puntuando
+          </span>
         )}
       </div>
     </div>
