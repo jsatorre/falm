@@ -295,7 +295,13 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
 
     for (const playerId of efectivos) {
       const report = reportePorJugador.get(playerId);
-      if (!report) continue; // todavía no ha jugado su partido esta ronda
+      // No basta con que haya report: un jugador puede llevar los 90
+      // minutos jugados y Biwenger todavía no haberle calculado la
+      // puntuación (rawStats sin "score3" — visto en un caso real, no es
+      // "0 puntos", es que su resultado aún no está listo). Contarlo como
+      // jugado inflaba el número de "Jugadores" sin ser cierto todavía.
+      const tieneResultado = report && (report.points?.[String(scoreId)] != null || report.rawStats?.score3 != null);
+      if (!tieneResultado) continue; // todavía no tiene resultado calculado
       const esCapitan = String(playerId) === String(capitanId);
       const esAriete = String(playerId) === String(arieteId);
       // El capitán cuenta DOBLE en el total del equipo (confirmado: la
@@ -304,13 +310,14 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
       // vez lo mismo) — sin esto el total del equipo siempre sale por
       // debajo del real cuando el capitán ha puntuado.
       const puntosBase = puntosPartido(report, scoreId);
-      // El ariete suma 1 punto EXTRA por cada gol suyo (ajuste "Ariete" de
-      // Ajustes de liga > Alineaciones — solo en ligas Premium/Ultra), y
-      // esto va POR ENCIMA de su puntuación normal, no sustituye nada de
-      // "Puntos Estadísticas" (confirmado con un ariete de 3 goles: su
-      // ficha ya mostraba su puntuación normal completa, y el total del
-      // equipo solo cuadraba sumando 3 puntos más aparte).
-      const bonusAriete = esAriete ? (report.rawStats?.goals ?? 0) : 0;
+      // El ariete suma 3 puntos EXTRA (fijos, no por cada gol) si marca
+      // algún gol — ajuste "Ariete" de Ajustes de liga > Alineaciones,
+      // solo en ligas Premium/Ultra — y esto va POR ENCIMA de su
+      // puntuación normal, no sustituye nada de "Puntos Estadísticas".
+      // Probado con dos arietes reales: uno con 3 goles y otro con 2 goles
+      // ambos necesitaban exactamente +3 para cuadrar con el total real —
+      // no es "puntos = goles", es un bonus fijo por marcar (confirmado).
+      const bonusAriete = esAriete && (report.rawStats?.goals ?? 0) > 0 ? 3 : 0;
       const puntos = (esCapitan ? puntosBase * 2 : puntosBase) + bonusAriete;
       total += puntos;
       jugadores.push({ id: playerId, nombre: report.player?.name ?? "?", puntos, capitan: esCapitan, ariete: esAriete });
