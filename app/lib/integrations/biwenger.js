@@ -152,10 +152,17 @@ export async function getHistoricalRoundPoints(teamIds) {
  * ficha individual de un jugador: mismas rawStats exactas (score3, mvp,
  * win, goals...).
  */
-async function getReportesRondaActual(intentos429 = 0) {
-  const res = await fetch(`https://cf.biwenger.com/api/v2/rounds/la-liga?lang=es&_=${Date.now()}`, {
-    cache: "no-store",
-  });
+async function getReportesRondaActual(scoreId, intentos429 = 0) {
+  // El parámetro `score` es obligatorio: sin él (probado sin querer)
+  // Biwenger devuelve otra forma de respuesta con las rawStats vacías y
+  // todos los jugadores a 0 puntos, aunque el partido ya haya terminado.
+  // `v` es la versión de la app oficial (la que manda su propio frontend,
+  // capturada de una sesión real) — se incluye para pedir exactamente la
+  // misma forma de respuesta que ya se verificó dato a dato como correcta.
+  const res = await fetch(
+    `https://cf.biwenger.com/api/v2/rounds/la-liga?score=${scoreId}&lang=es&v=631&_=${Date.now()}`,
+    { cache: "no-store" }
+  );
   // Esta es ahora LA llamada de la que depende todo el marcador en directo
   // (antes el reintento importaba poco, un jugador de ~130 fallando apenas
   // se notaba — ahora si esta falla no hay nada). Un reintento corto para
@@ -163,7 +170,7 @@ async function getReportesRondaActual(intentos429 = 0) {
   // reintentos no van a arreglarlo y solo alargan la espera.
   if (res.status === 429 && intentos429 < 1) {
     await new Promise((r) => setTimeout(r, 300));
-    return getReportesRondaActual(intentos429 + 1);
+    return getReportesRondaActual(scoreId, intentos429 + 1);
   }
   if (!res.ok) throw new Error(`Biwenger rounds/la-liga -> ${res.status}`);
   const { data } = await res.json();
@@ -205,7 +212,7 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const oncesPorEquipo = await getOncesEnVivoLiga(biwengerRoundIdEnVivo);
   if (!oncesPorEquipo) return null;
 
-  const { roundId, reportePorJugador } = await getReportesRondaActual();
+  const { roundId, reportePorJugador } = await getReportesRondaActual(scoreId);
   if (String(roundId) !== String(biwengerRoundIdEnVivo)) return null; // desfase puntual, mejor no calcular nada mal
 
   const idsSinReporte = new Set();
