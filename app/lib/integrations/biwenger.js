@@ -176,15 +176,17 @@ async function getReportesRondaActual(scoreId, intentos429 = 0) {
   const { data } = await res.json();
 
   const reportePorJugador = new Map(); // playerId -> report (con match.status añadido, para caso de necesitarlo)
+  const estadoPorClubId = new Map(); // clubId -> "finished"/"active"/... — para el caso de un jugador sin report en absoluto (ver getLiveRoundPoints)
   for (const game of data.games ?? []) {
     for (const lado of [game.home, game.away]) {
+      if (lado?.id != null) estadoPorClubId.set(lado.id, game.status);
       for (const report of lado?.reports ?? []) {
         if (report.player?.id == null) continue;
         reportePorJugador.set(report.player.id, { ...report, match: { status: game.status } });
       }
     }
   }
-  return { roundId: data.id, reportePorJugador };
+  return { roundId: data.id, reportePorJugador, estadoPorClubId };
 }
 
 /**
@@ -212,7 +214,7 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const oncesPorEquipo = await getOncesEnVivoLiga(biwengerRoundIdEnVivo);
   if (!oncesPorEquipo) return null;
 
-  const { roundId, reportePorJugador } = await getReportesRondaActual(scoreId);
+  const { roundId, reportePorJugador, estadoPorClubId } = await getReportesRondaActual(scoreId);
   if (String(roundId) !== String(biwengerRoundIdEnVivo)) return null; // desfase puntual, mejor no calcular nada mal
 
   const idsSinReporte = new Set();
@@ -229,15 +231,42 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
       return null;
     }),
   ]);
-  const statusPorIdSinReporte = new Map(fichasSinReporte.map(([id, ficha]) => [id, ficha?.status ?? null]));
-  // El endpoint en bloque a veces va un pelín por detrás del real para
-  // algún jugador suelto (su partido acaba de actualizarse y todavía no
-  // se refleja ahí) — como de todas formas ya se pide su ficha individual
-  // para mirar el "status", se aprovecha esa misma respuesta para rellenar
-  // el report si lo trae, en vez de dejarlo fuera del cómputo sin más.
+  // El "status" de la ficha (lesionado/sancionado/ok) NO sirve para decidir
+  // si toca sustitución — confirmado con un caso real: Angeliño estaba
+  // "ok" (disponible) pero no jugó ni un minuto, y su ficha SÍ trae un
+  // report para la ronda (su partido ya cerró) pero sin rawStats ninguna
+  // (sin minutos, sin goles, nada). La señal correcta es esa: ¿tiene
+  // estadísticas reales? Si su partido ya cerró y no las tiene, no jugó de
+  // verdad y toca sustituir — aunque su "status" general diga que está bien.
+  //
+  // Un segundo caso, más raro: un jugador sin NINGÚN report para esta
+  // ronda (ni siquiera uno vacío como Angeliño) — probablemente una baja
+  // larga. Ahí no hay match propio al que mirarle el status, pero si el
+  // partido de SU CLUB ya ha terminado y aun así no aparece en ningún
+  // report, tampoco ha jugado — toca sustitución igual.
+  const idsDescartados = new Set(); // titular sin jugar de verdad -> toca sustitución
+  const posicionPorId = new Map(); // hace falta para sustituir por un suplente de la MISMA posición, ver más abajo
   for (const [id, ficha] of fichasSinReporte) {
+    if (ficha?.position != null) posicionPorId.set(id, ficha.position);
     const report = ficha?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
-    if (report) reportePorJugador.set(id, report);
+    if (report?.rawStats) {
+      // El endpoint en bloque a veces va un pelín por detrás del real para
+      // algún jugador suelto (su partido se acaba de actualizar y todavía
+      // no se refleja ahí) — aquí sí hay estadísticas reales, se usa igual
+      // que si viniera del bloque (añadiendo el nombre, que la ficha
+      // individual no trae en el propio report).
+      reportePorJugador.set(id, { ...report, player: { id, name: ficha.name, position: ficha.position } });
+    } else {
+      const partidoDeSuClubCerrado = estadoPorClubId.get(ficha?.team?.id) === "finished";
+      if (report?.match?.status === "finished" || partidoDeSuClubCerrado) idsDescartados.add(id);
+      // si no, su partido (el suyo o el de su club) probablemente no ha
+      // empezado todavía — no se sustituye, solo no cuenta nada por ahora.
+    }
+  }
+  for (const report of reportePorJugador.values()) {
+    if (report.player?.id != null && report.player?.position != null) {
+      posicionPorId.set(report.player.id, report.player.position);
+    }
   }
 
   const resultado = new Map();
@@ -246,20 +275,22 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
     const jugadores = [];
     // Sustitución automática: `lineup.players` (/rounds/league) es el once
     // TAL COMO SE ALINEÓ, no se actualiza si luego un titular queda
-    // descartado (lesión/sanción confirmada tras el cierre de alineaciones)
-    // — pero Biwenger sí lo sustituye por el primer suplente disponible a
-    // la hora de sumar puntos (confirmado en la propia ficha del suplente:
-    // "Sustituye a X"). Sin esto, ese hueco cuenta como si no hubiera
-    // jugado nadie, y el total del equipo sale por debajo del real.
-    const reservasDisponibles = [...reservas];
-    let indiceReserva = 0;
+    // descartado (no llegó a jugar) — pero Biwenger sí lo sustituye por el
+    // primer suplente de la MISMA posición a la hora de sumar puntos
+    // (confirmado en la propia ficha del suplente: "Sustituye a X"). Tiene
+    // que ser de la misma posición: probado sin ese filtro y un portero de
+    // reserva acabó "sustituyendo" a un jugador de campo, disparando el
+    // total muy por encima del real.
+    const reservasUsadas = new Set();
     const efectivos = titulares.map((playerId) => {
-      const status = reportePorJugador.has(playerId) ? "ok" : statusPorIdSinReporte.get(playerId);
-      if (status && status !== "ok") {
-        const suplenteId = reservasDisponibles[indiceReserva++];
-        if (suplenteId != null) return suplenteId;
-      }
-      return playerId;
+      if (!idsDescartados.has(playerId)) return playerId;
+      const posicionNecesaria = posicionPorId.get(playerId);
+      const suplenteId = reservas.find(
+        (id) => id != null && !reservasUsadas.has(id) && posicionPorId.get(id) === posicionNecesaria
+      );
+      if (suplenteId == null) return playerId; // sin suplente de su posición disponible, no se sustituye
+      reservasUsadas.add(suplenteId);
+      return suplenteId;
     });
 
     for (const playerId of efectivos) {
