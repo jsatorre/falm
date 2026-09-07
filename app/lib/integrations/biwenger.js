@@ -162,11 +162,11 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   if (!oncesPorEquipo) return null;
 
   const idsUnicos = new Set();
-  oncesPorEquipo.forEach((titulares) => titulares.forEach((id) => idsUnicos.add(id)));
+  oncesPorEquipo.forEach(({ titulares }) => titulares.forEach((id) => idsUnicos.add(id)));
 
   const fichas = await mapConLimite([...idsUnicos], 5, async (id) => [
     id,
-    await getFichaJugador(id).catch((err) => {
+    await getFichaJugador(id, { roundIdEnVivo: biwengerRoundIdEnVivo }).catch((err) => {
       console.warn(`No se ha podido traer la ficha del jugador ${id}:`, err);
       return null;
     }),
@@ -174,16 +174,22 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const fichaPorId = new Map(fichas);
 
   const resultado = new Map();
-  for (const [teamId, titulares] of oncesPorEquipo) {
+  for (const [teamId, { titulares, capitanId }] of oncesPorEquipo) {
     let total = 0;
     const jugadores = [];
     for (const playerId of titulares) {
       const ficha = fichaPorId.get(playerId);
       const report = ficha?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
       if (!report) continue; // todavía no ha jugado su partido esta ronda
-      const puntos = puntosPartido(report, scoreId);
+      // El capitán cuenta DOBLE en el total del equipo (confirmado: la
+      // ficha del jugador muestra su puntuación tal cual, pero la
+      // clasificación de Biwenger solo cuadra si al capitán se le suma otra
+      // vez lo mismo) — sin esto el total del equipo siempre sale por
+      // debajo del real cuando el capitán ha puntuado.
+      const puntosBase = puntosPartido(report, scoreId);
+      const puntos = String(playerId) === String(capitanId) ? puntosBase * 2 : puntosBase;
       total += puntos;
-      jugadores.push({ id: playerId, nombre: ficha.name, puntos });
+      jugadores.push({ id: playerId, nombre: ficha.name, puntos, capitan: String(playerId) === String(capitanId) });
     }
     jugadores.sort((a, b) => b.puntos - a.puntos);
     resultado.set(teamId, { total, jugadores });
@@ -208,7 +214,10 @@ async function getOncesEnVivoLiga(biwengerRoundIdEnVivo) {
   return new Map(
     (data.league?.standings ?? []).map((s) => [
       String(s.id),
-      (s.lineup?.players ?? []).filter((id) => id != null),
+      {
+        titulares: (s.lineup?.players ?? []).filter((id) => id != null),
+        capitanId: s.lineup?.captain?.id ?? null,
+      },
     ])
   );
 }
@@ -297,24 +306,42 @@ async function fetchFichaJugador(playerId, intentos429 = 0) {
 // Cloudflare (ese ya se salta con el `_` de arriba) — es nuestro: durante
 // una ronda en directo, syncBiwengerResultsCached() vuelve a llamar a esto
 // cada 60s para los mismos ~130 jugadores, y ese volumen repetido es lo
-// que dispara los 429. Con 3 min de margen, la mayoría de ciclos reutiliza
-// la ficha ya traída en vez de volver a pedirla — el marcador se queda como
-// mucho unos minutos por detrás en vez de roto por bloqueo. Un fallo no se
-// cachea (se borra la entrada), para poder reintentarlo en el siguiente ciclo.
-const FICHA_CACHE_MS = 3 * 60 * 1000;
-const fichaCache = new Map(); // playerId -> { ts, promise }
+// que dispara los 429. Un fallo no se cachea (se borra la entrada), para
+// poder reintentarlo en el siguiente ciclo.
+//
+// El TTL no es fijo: si quien llama indica para qué ronda en directo
+// necesita el dato (roundIdEnVivo) y el partido de ESE jugador en ESA
+// ronda ya aparece "finished", sus puntos no van a cambiar más — se
+// cachea mucho tiempo. Si sigue en juego (o no se sabe), se cachea poco,
+// para no servir un marcador desactualizado mientras el partido continúa.
+// Sin esta distinción, cachear todo por igual varios minutos deja el
+// marcador en directo sistemáticamente por debajo del real mientras el
+// partido avanza (confirmado: puntos algo más bajos que Biwenger en todos
+// los equipos con partido en juego, exactamente el mismo nº de jugadores).
+const FICHA_CACHE_MS_EN_JUEGO = 30 * 1000;
+const FICHA_CACHE_MS_CERRADO = 30 * 60 * 1000;
+const fichaCache = new Map(); // playerId -> { ts, ttl, promise }
 
-export async function getFichaJugador(playerId) {
+export async function getFichaJugador(playerId, { roundIdEnVivo } = {}) {
   const ahora = Date.now();
   const entrada = fichaCache.get(playerId);
-  if (entrada && ahora - entrada.ts < FICHA_CACHE_MS) return entrada.promise;
+  if (entrada && ahora - entrada.ts < entrada.ttl) return entrada.promise;
 
-  const promise = fetchFichaJugador(playerId).catch((err) => {
+  const promise = fetchFichaJugador(playerId);
+  fichaCache.set(playerId, { ts: ahora, ttl: FICHA_CACHE_MS_EN_JUEGO, promise });
+
+  try {
+    const ficha = await promise;
+    if (roundIdEnVivo != null) {
+      const report = ficha.reports?.find((r) => String(r.match?.round?.id) === String(roundIdEnVivo));
+      const ttl = report?.match?.status === "finished" ? FICHA_CACHE_MS_CERRADO : FICHA_CACHE_MS_EN_JUEGO;
+      fichaCache.set(playerId, { ts: ahora, ttl, promise });
+    }
+    return ficha;
+  } catch (err) {
     fichaCache.delete(playerId);
     throw err;
-  });
-  fichaCache.set(playerId, { ts: ahora, promise });
-  return promise;
+  }
 }
 
 /**
