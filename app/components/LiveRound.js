@@ -31,6 +31,10 @@ export default function LiveRound({ inicial }) {
   }
 
   useEffect(() => {
+    // La página ya no espera al sync para pintar (ver app/en-directo/page.js)
+    // — pide uno fresco nada más montarse, así lo que se ve al entrar no se
+    // queda con el último dato guardado hasta que pase el primer AUTO_MS.
+    actualizar();
     const idAuto = setInterval(actualizar, AUTO_MS);
     const idReloj = setInterval(() => setAhora(Date.now()), 1000);
     return () => {
