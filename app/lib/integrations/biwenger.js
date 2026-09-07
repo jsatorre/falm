@@ -174,22 +174,31 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const fichaPorId = new Map(fichas);
 
   const resultado = new Map();
-  for (const [teamId, { titulares, capitanId }] of oncesPorEquipo) {
+  for (const [teamId, { titulares, capitanId, arieteId }] of oncesPorEquipo) {
     let total = 0;
     const jugadores = [];
     for (const playerId of titulares) {
       const ficha = fichaPorId.get(playerId);
       const report = ficha?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
       if (!report) continue; // todavía no ha jugado su partido esta ronda
+      const esCapitan = String(playerId) === String(capitanId);
+      const esAriete = String(playerId) === String(arieteId);
       // El capitán cuenta DOBLE en el total del equipo (confirmado: la
       // ficha del jugador muestra su puntuación tal cual, pero la
       // clasificación de Biwenger solo cuadra si al capitán se le suma otra
       // vez lo mismo) — sin esto el total del equipo siempre sale por
       // debajo del real cuando el capitán ha puntuado.
       const puntosBase = puntosPartido(report, scoreId);
-      const puntos = String(playerId) === String(capitanId) ? puntosBase * 2 : puntosBase;
+      // El ariete suma 1 punto EXTRA por cada gol suyo (ajuste "Ariete" de
+      // Ajustes de liga > Alineaciones — solo en ligas Premium/Ultra), y
+      // esto va POR ENCIMA de su puntuación normal, no sustituye nada de
+      // "Puntos Estadísticas" (confirmado con un ariete de 3 goles: su
+      // ficha ya mostraba su puntuación normal completa, y el total del
+      // equipo solo cuadraba sumando 3 puntos más aparte).
+      const bonusAriete = esAriete ? (report.rawStats?.goals ?? 0) : 0;
+      const puntos = (esCapitan ? puntosBase * 2 : puntosBase) + bonusAriete;
       total += puntos;
-      jugadores.push({ id: playerId, nombre: ficha.name, puntos, capitan: String(playerId) === String(capitanId) });
+      jugadores.push({ id: playerId, nombre: ficha.name, puntos, capitan: esCapitan, ariete: esAriete });
     }
     jugadores.sort((a, b) => b.puntos - a.puntos);
     resultado.set(teamId, { total, jugadores });
@@ -217,6 +226,7 @@ async function getOncesEnVivoLiga(biwengerRoundIdEnVivo) {
       {
         titulares: (s.lineup?.players ?? []).filter((id) => id != null),
         capitanId: s.lineup?.captain?.id ?? null,
+        arieteId: s.lineup?.striker?.id ?? null,
       },
     ])
   );
