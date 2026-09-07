@@ -230,6 +230,15 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
     }),
   ]);
   const statusPorIdSinReporte = new Map(fichasSinReporte.map(([id, ficha]) => [id, ficha?.status ?? null]));
+  // El endpoint en bloque a veces va un pelín por detrás del real para
+  // algún jugador suelto (su partido acaba de actualizarse y todavía no
+  // se refleja ahí) — como de todas formas ya se pide su ficha individual
+  // para mirar el "status", se aprovecha esa misma respuesta para rellenar
+  // el report si lo trae, en vez de dejarlo fuera del cómputo sin más.
+  for (const [id, ficha] of fichasSinReporte) {
+    const report = ficha?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
+    if (report) reportePorJugador.set(id, report);
+  }
 
   const resultado = new Map();
   for (const [teamId, { titulares, reservas, capitanId, arieteId }] of oncesPorEquipo) {
