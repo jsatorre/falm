@@ -162,7 +162,10 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   if (!oncesPorEquipo) return null;
 
   const idsUnicos = new Set();
-  oncesPorEquipo.forEach(({ titulares }) => titulares.forEach((id) => idsUnicos.add(id)));
+  oncesPorEquipo.forEach(({ titulares, reservas }) => {
+    titulares.forEach((id) => idsUnicos.add(id));
+    reservas.forEach((id) => idsUnicos.add(id)); // hacen falta para detectar sustituciones automáticas (ver más abajo)
+  });
 
   const fichas = await mapConLimite([...idsUnicos], 5, async (id) => [
     id,
@@ -174,10 +177,30 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const fichaPorId = new Map(fichas);
 
   const resultado = new Map();
-  for (const [teamId, { titulares, capitanId, arieteId }] of oncesPorEquipo) {
+  for (const [teamId, { titulares, reservas, capitanId, arieteId }] of oncesPorEquipo) {
     let total = 0;
     const jugadores = [];
-    for (const playerId of titulares) {
+    // Sustitución automática: `lineup.players` (/rounds/league) es el once
+    // TAL COMO SE ALINEÓ, no se actualiza si luego un titular queda
+    // descartado (lesión/sanción confirmada tras el cierre de alineaciones)
+    // — pero Biwenger sí lo sustituye por el primer suplente disponible a
+    // la hora de sumar puntos (confirmado en la propia ficha del suplente:
+    // "Sustituye a X"). Sin esto, ese hueco cuenta como si no hubiera
+    // jugado nadie, y el total del equipo sale por debajo del real.
+    const reservasDisponibles = [...reservas];
+    let indiceReserva = 0;
+    const efectivos = titulares.map((playerId) => {
+      const ficha = fichaPorId.get(playerId);
+      if (ficha && ficha.status !== "ok") {
+        while (indiceReserva < reservasDisponibles.length) {
+          const suplenteId = reservasDisponibles[indiceReserva++];
+          if (fichaPorId.get(suplenteId)) return suplenteId;
+        }
+      }
+      return playerId;
+    });
+
+    for (const playerId of efectivos) {
       const ficha = fichaPorId.get(playerId);
       const report = ficha?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
       if (!report) continue; // todavía no ha jugado su partido esta ronda
@@ -225,6 +248,7 @@ async function getOncesEnVivoLiga(biwengerRoundIdEnVivo) {
       String(s.id),
       {
         titulares: (s.lineup?.players ?? []).filter((id) => id != null),
+        reservas: (s.lineup?.reserves ?? []).filter((id) => id != null),
         capitanId: s.lineup?.captain?.id ?? null,
         arieteId: s.lineup?.striker?.id ?? null,
       },
