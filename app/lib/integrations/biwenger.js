@@ -164,9 +164,13 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const idsUnicos = new Set();
   oncesPorEquipo.forEach((titulares) => titulares.forEach((id) => idsUnicos.add(id)));
 
-  const fichas = await Promise.all(
-    [...idsUnicos].map(async (id) => [id, await getFichaJugador(id).catch(() => null)])
-  );
+  const fichas = await mapConLimite([...idsUnicos], 5, async (id) => [
+    id,
+    await getFichaJugador(id).catch((err) => {
+      console.warn(`No se ha podido traer la ficha del jugador ${id}:`, err);
+      return null;
+    }),
+  ]);
   const fichaPorId = new Map(fichas);
 
   const resultado = new Map();
@@ -261,7 +265,7 @@ export async function getAlineacionesPorJornada(biwengerTeamId) {
  * (reports[].rawStats: goles, minutos jugados, MVP, etc.). Endpoint
  * público, sin login.
  */
-export async function getFichaJugador(playerId) {
+async function fetchFichaJugador(playerId, intentos429 = 0) {
   // El CDN de Cloudflare cachea esta URL por su cuenta durante HORAS
   // (confirmado: una respuesta con "Age: 7326" — más de 2h vieja — no
   // tenía todavía el partido de un jugador que llevaba toda la segunda
@@ -272,9 +276,64 @@ export async function getFichaJugador(playerId) {
     `https://cf.biwenger.com/api/v2/players/la-liga/${playerId}?fields=*,team,fitness,reports,competition&score=3&lang=es&_=${Date.now()}`,
     { cache: "no-store" }
   );
+  // Confirmado en pruebas reales: si se lanzan muchas de golpe (la ronda en
+  // directo puede necesitar hasta ~130, una por jugador con algún titular
+  // jugando), Cloudflare responde 429 — y no solo de forma puntual, el
+  // bloqueo puede mantenerse varios minutos aunque se baje la concurrencia
+  // (ver getFichaJugador más abajo, que además cachea para no volver a
+  // pedir lo mismo en el siguiente ciclo). Un par de reintentos cortos
+  // ayuda con bloqueos breves; para los sostenidos, lo que de verdad hace
+  // falta es no repetir la petición innecesariamente.
+  if (res.status === 429 && intentos429 < 3) {
+    await new Promise((r) => setTimeout(r, 300 * (intentos429 + 1)));
+    return fetchFichaJugador(playerId, intentos429 + 1);
+  }
   if (!res.ok) throw new Error(`Biwenger player ${playerId} -> ${res.status}`);
   const { data } = await res.json();
   return data;
+}
+
+// Caché corta en memoria del proceso, por jugador. No es por el caché de
+// Cloudflare (ese ya se salta con el `_` de arriba) — es nuestro: durante
+// una ronda en directo, syncBiwengerResultsCached() vuelve a llamar a esto
+// cada 60s para los mismos ~130 jugadores, y ese volumen repetido es lo
+// que dispara los 429. Con 3 min de margen, la mayoría de ciclos reutiliza
+// la ficha ya traída en vez de volver a pedirla — el marcador se queda como
+// mucho unos minutos por detrás en vez de roto por bloqueo. Un fallo no se
+// cachea (se borra la entrada), para poder reintentarlo en el siguiente ciclo.
+const FICHA_CACHE_MS = 3 * 60 * 1000;
+const fichaCache = new Map(); // playerId -> { ts, promise }
+
+export async function getFichaJugador(playerId) {
+  const ahora = Date.now();
+  const entrada = fichaCache.get(playerId);
+  if (entrada && ahora - entrada.ts < FICHA_CACHE_MS) return entrada.promise;
+
+  const promise = fetchFichaJugador(playerId).catch((err) => {
+    fichaCache.delete(playerId);
+    throw err;
+  });
+  fichaCache.set(playerId, { ts: ahora, promise });
+  return promise;
+}
+
+/**
+ * Igual que Promise.all pero como mucho `limite` promesas de `fn` en
+ * marcha a la vez. La ronda en directo puede necesitar hasta ~130 fichas
+ * de jugador de golpe — lanzarlas todas en paralelo (sin límite) es lo que
+ * provoca los 429 de Cloudflare descritos en getFichaJugador.
+ */
+async function mapConLimite(items, limite, fn) {
+  const resultado = new Array(items.length);
+  let siguiente = 0;
+  async function trabajador() {
+    while (siguiente < items.length) {
+      const i = siguiente++;
+      resultado[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limite, items.length) }, trabajador));
+  return resultado;
 }
 
 /**
