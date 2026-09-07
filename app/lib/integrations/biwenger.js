@@ -142,39 +142,87 @@ export async function getHistoricalRoundPoints(teamIds) {
 }
 
 /**
+ * Reports (rawStats completas) de TODOS los jugadores que han disputado
+ * algún partido de la ronda ACTUAL de La Liga — en UNA sola llamada
+ * pública (sin login, gratis). Sustituye lo que antes costaba hasta ~130
+ * llamadas sueltas (una por jugador, ver el antiguo getFichaJugador en
+ * bucle): ese volumen es justo lo que Cloudflare acababa bloqueando con
+ * 429 de forma sostenida bajo carga real (confirmado también en los logs
+ * de producción, no solo en local). Verificado dato a dato contra la
+ * ficha individual de un jugador: mismas rawStats exactas (score3, mvp,
+ * win, goals...).
+ */
+async function getReportesRondaActual(intentos429 = 0) {
+  const res = await fetch(`https://cf.biwenger.com/api/v2/rounds/la-liga?lang=es&_=${Date.now()}`, {
+    cache: "no-store",
+  });
+  // Esta es ahora LA llamada de la que depende todo el marcador en directo
+  // (antes el reintento importaba poco, un jugador de ~130 fallando apenas
+  // se notaba — ahora si esta falla no hay nada). Un reintento corto para
+  // un pico puntual; si Cloudflare está en bloqueo sostenido, más
+  // reintentos no van a arreglarlo y solo alargan la espera.
+  if (res.status === 429 && intentos429 < 1) {
+    await new Promise((r) => setTimeout(r, 300));
+    return getReportesRondaActual(intentos429 + 1);
+  }
+  if (!res.ok) throw new Error(`Biwenger rounds/la-liga -> ${res.status}`);
+  const { data } = await res.json();
+
+  const reportePorJugador = new Map(); // playerId -> report (con match.status añadido, para caso de necesitarlo)
+  for (const game of data.games ?? []) {
+    for (const lado of [game.home, game.away]) {
+      for (const report of lado?.reports ?? []) {
+        if (report.player?.id == null) continue;
+        reportePorJugador.set(report.player.id, { ...report, match: { status: game.status } });
+      }
+    }
+  }
+  return { roundId: data.id, reportePorJugador };
+}
+
+/**
  * Puntos EN VIVO de todos los equipos para la ronda que está en juego
  * ahora mismo — no se fía del campo oficial de Biwenger (no lo rellena
  * hasta cerrar la jornada ENTERA, aunque partidos sueltos ya hayan
- * terminado): se calcula sumando los puntos de cada titular desde su
- * ficha pública (gratis, sin límite de tu cuenta), con la misma fórmula
- * que ya usa "Equipo" (ver puntosPartido). El once de cada equipo sale de
- * getOncesEnVivoLiga (1 sola llamada a tu cuenta para los 12 equipos).
+ * terminado): se calcula sumando los puntos de cada titular con la misma
+ * fórmula que ya usa "Equipo" (ver puntosPartido), a partir de los
+ * reports en bloque de getReportesRondaActual. El once de cada equipo
+ * sale de getOncesEnVivoLiga (1 sola llamada a tu cuenta para los 12
+ * equipos).
+ *
+ * Solo se pide la ficha individual (cara, con reintentos) de un jugador
+ * cuando NO aparece en absoluto en los reports en bloque — o su partido
+ * todavía no ha empezado, o está descartado (lesión/sanción) y hace
+ * falta mirar su "status" para decidir si toca sustitución automática.
+ * En un ciclo normal esto son 0-2 llamadas, no ~130.
  *
  * Devuelve un Map teamId -> { total, jugadores }, donde `jugadores` es la
  * lista de titulares que YA tienen datos de su partido (ya jugado o en
- * juego), con nombre y puntos — para poder enseñar quién está puntuando
- * ahora mismo sin gastar ni una llamada de más, es la misma ficha pública
- * que ya se pedía para sumar el total. O null si Biwenger no considera
- * esta ronda como la activa ahora mismo.
+ * juego). O null si Biwenger no considera esta ronda como la activa
+ * ahora mismo.
  */
 export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
   const oncesPorEquipo = await getOncesEnVivoLiga(biwengerRoundIdEnVivo);
   if (!oncesPorEquipo) return null;
 
-  const idsUnicos = new Set();
+  const { roundId, reportePorJugador } = await getReportesRondaActual();
+  if (String(roundId) !== String(biwengerRoundIdEnVivo)) return null; // desfase puntual, mejor no calcular nada mal
+
+  const idsSinReporte = new Set();
   oncesPorEquipo.forEach(({ titulares, reservas }) => {
-    titulares.forEach((id) => idsUnicos.add(id));
-    reservas.forEach((id) => idsUnicos.add(id)); // hacen falta para detectar sustituciones automáticas (ver más abajo)
+    [...titulares, ...reservas].forEach((id) => {
+      if (!reportePorJugador.has(id)) idsSinReporte.add(id);
+    });
   });
 
-  const fichas = await mapConLimite([...idsUnicos], 5, async (id) => [
+  const fichasSinReporte = await mapConLimite([...idsSinReporte], 5, async (id) => [
     id,
     await getFichaJugador(id, { roundIdEnVivo: biwengerRoundIdEnVivo }).catch((err) => {
-      console.warn(`No se ha podido traer la ficha del jugador ${id}:`, err);
+      console.warn(`No se ha podido traer la ficha del jugador ${id} (sin report en bloque):`, err);
       return null;
     }),
   ]);
-  const fichaPorId = new Map(fichas);
+  const statusPorIdSinReporte = new Map(fichasSinReporte.map(([id, ficha]) => [id, ficha?.status ?? null]));
 
   const resultado = new Map();
   for (const [teamId, { titulares, reservas, capitanId, arieteId }] of oncesPorEquipo) {
@@ -190,19 +238,16 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
     const reservasDisponibles = [...reservas];
     let indiceReserva = 0;
     const efectivos = titulares.map((playerId) => {
-      const ficha = fichaPorId.get(playerId);
-      if (ficha && ficha.status !== "ok") {
-        while (indiceReserva < reservasDisponibles.length) {
-          const suplenteId = reservasDisponibles[indiceReserva++];
-          if (fichaPorId.get(suplenteId)) return suplenteId;
-        }
+      const status = reportePorJugador.has(playerId) ? "ok" : statusPorIdSinReporte.get(playerId);
+      if (status && status !== "ok") {
+        const suplenteId = reservasDisponibles[indiceReserva++];
+        if (suplenteId != null) return suplenteId;
       }
       return playerId;
     });
 
     for (const playerId of efectivos) {
-      const ficha = fichaPorId.get(playerId);
-      const report = ficha?.reports?.find((r) => String(r.match?.round?.id) === String(biwengerRoundIdEnVivo));
+      const report = reportePorJugador.get(playerId);
       if (!report) continue; // todavía no ha jugado su partido esta ronda
       const esCapitan = String(playerId) === String(capitanId);
       const esAriete = String(playerId) === String(arieteId);
@@ -221,7 +266,7 @@ export async function getLiveRoundPoints(biwengerRoundIdEnVivo, scoreId) {
       const bonusAriete = esAriete ? (report.rawStats?.goals ?? 0) : 0;
       const puntos = (esCapitan ? puntosBase * 2 : puntosBase) + bonusAriete;
       total += puntos;
-      jugadores.push({ id: playerId, nombre: ficha.name, puntos, capitan: esCapitan, ariete: esAriete });
+      jugadores.push({ id: playerId, nombre: report.player?.name ?? "?", puntos, capitan: esCapitan, ariete: esAriete });
     }
     jugadores.sort((a, b) => b.puntos - a.puntos);
     resultado.set(teamId, { total, jugadores });
@@ -319,16 +364,17 @@ async function fetchFichaJugador(playerId, intentos429 = 0) {
     `https://cf.biwenger.com/api/v2/players/la-liga/${playerId}?fields=*,team,fitness,reports,competition&score=3&lang=es&_=${Date.now()}`,
     { cache: "no-store" }
   );
-  // Confirmado en pruebas reales: si se lanzan muchas de golpe (la ronda en
-  // directo puede necesitar hasta ~130, una por jugador con algún titular
-  // jugando), Cloudflare responde 429 — y no solo de forma puntual, el
-  // bloqueo puede mantenerse varios minutos aunque se baje la concurrencia
-  // (ver getFichaJugador más abajo, que además cachea para no volver a
-  // pedir lo mismo en el siguiente ciclo). Un par de reintentos cortos
-  // ayuda con bloqueos breves; para los sostenidos, lo que de verdad hace
-  // falta es no repetir la petición innecesariamente.
-  if (res.status === 429 && intentos429 < 3) {
-    await new Promise((r) => setTimeout(r, 300 * (intentos429 + 1)));
+  // Confirmado en pruebas reales (local Y en Vercel, por logs): si se
+  // lanzan muchas de golpe (la ronda en directo puede necesitar hasta
+  // ~130, una por jugador con algún titular jugando), Cloudflare responde
+  // 429 — y el bloqueo puede mantenerse sostenido varios minutos, no es
+  // solo un pico puntual. Reintentar mucho en ese caso no arregla nada y
+  // solo alarga la carga (con 3 intentos y ~130 jugadores se iba a más de
+  // 1 minuto) — mejor UN reintento corto (para el caso de un pico breve) y
+  // rendirse rápido; lo que de verdad evita repetir la petición es la
+  // caché de getFichaJugador más abajo, no insistir aquí.
+  if (res.status === 429 && intentos429 < 1) {
+    await new Promise((r) => setTimeout(r, 250));
     return fetchFichaJugador(playerId, intentos429 + 1);
   }
   if (!res.ok) throw new Error(`Biwenger player ${playerId} -> ${res.status}`);
