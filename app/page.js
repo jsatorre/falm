@@ -129,6 +129,7 @@ export default async function ClasificacionPage() {
                 month: "2-digit",
                 hour: "2-digit",
                 minute: "2-digit",
+                timeZone: "Europe/Madrid",
               })}{" "}
               (se refresca al abrir En directo)
             </p>
