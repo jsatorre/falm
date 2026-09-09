@@ -116,21 +116,56 @@ export function deadlinePasada(ronda) {
   return Boolean(ronda.fichajes_deadline) && new Date(ronda.fichajes_deadline) <= new Date();
 }
 
+const ZONA_HORA_TOPE = "Europe/Madrid";
+
 /**
- * Próxima ocurrencia de un día de la semana + hora, estrictamente después
- * de `desde` (nunca devuelve "ahora mismo" ni el pasado). diaSemana usa el
- * mismo criterio que Date#getDay(): 0 = domingo ... 6 = sábado.
+ * Instante UTC real que corresponde a año/mes/día + hora:minuto tal como
+ * se leerían en un reloj de `zona` (con cambio de horario verano/invierno
+ * ya resuelto). Hace falta porque el servidor (Vercel) corre en UTC, no
+ * en hora de España — sin esto, "14:00" se guardaba tal cual como 14:00
+ * UTC (16:00 en Madrid en verano), dos horas tarde.
+ */
+function horaLocalAFechaUTC(anio, mes, dia, horas, minutos, zona) {
+  const comoSiFueraUTC = new Date(Date.UTC(anio, mes - 1, dia, horas, minutos));
+  const enZona = new Date(comoSiFueraUTC.toLocaleString("en-US", { timeZone: zona }));
+  const enUTC = new Date(comoSiFueraUTC.toLocaleString("en-US", { timeZone: "UTC" }));
+  const offsetMs = enZona.getTime() - enUTC.getTime();
+  return new Date(comoSiFueraUTC.getTime() - offsetMs);
+}
+
+/**
+ * Próxima ocurrencia de un día de la semana + hora EN HORA DE ESPAÑA,
+ * estrictamente después de `desde` (nunca devuelve "ahora mismo" ni el
+ * pasado). diaSemana usa el mismo criterio que Date#getDay(): 0 = domingo
+ * ... 6 = sábado, tomando el día tal como cae en Madrid, no en el
+ * servidor.
  */
 export function calcularProximaHoraTope(diaSemana, horaStr, desde = new Date()) {
   const [horas, minutos] = horaStr.split(":").map(Number);
-  const candidato = new Date(desde);
-  candidato.setHours(horas, minutos, 0, 0);
 
-  const diasHastaObjetivo = (diaSemana - candidato.getDay() + 7) % 7;
-  candidato.setDate(candidato.getDate() + diasHastaObjetivo);
+  const partesHoy = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: ZONA_HORA_TOPE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(desde)
+      .map((p) => [p.type, p.value])
+  );
+  const hoyUTC = Date.UTC(Number(partesHoy.year), Number(partesHoy.month) - 1, Number(partesHoy.day));
+  const diaSemanaHoy = new Date(hoyUTC).getUTCDay();
+
+  const candidatoEnDia = (offsetDias) => {
+    const d = new Date(hoyUTC + offsetDias * 86400000);
+    return horaLocalAFechaUTC(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), horas, minutos, ZONA_HORA_TOPE);
+  };
+
+  let diasHastaObjetivo = (diaSemana - diaSemanaHoy + 7) % 7;
+  let candidato = candidatoEnDia(diasHastaObjetivo);
 
   if (candidato <= desde) {
-    candidato.setDate(candidato.getDate() + 7);
+    candidato = candidatoEnDia(diasHastaObjetivo + 7);
   }
 
   return candidato;
