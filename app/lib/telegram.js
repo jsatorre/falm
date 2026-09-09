@@ -5,7 +5,7 @@
  * Sin esas dos variables no hace nada (no revienta el sync por no estar
  * configurado).
  */
-export async function enviarTelegram(texto) {
+export async function enviarTelegram(texto, { html = false } = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) {
@@ -16,7 +16,12 @@ export async function enviarTelegram(texto) {
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text: texto, disable_web_page_preview: true }),
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: texto,
+      disable_web_page_preview: true,
+      ...(html ? { parse_mode: "HTML" } : {}),
+    }),
   });
   if (!res.ok) {
     console.warn("No se ha podido enviar el aviso de Telegram:", await res.text());

@@ -46,13 +46,24 @@ export async function avisarJornadasCerradas(rondaIdsRecienCerradas) {
   for (const ronda of cerradas) {
     const mensaje = construirMensajeJornadaCerrada(ronda, fixtures, results, nombrePorId, teams);
     try {
-      await enviarTelegram(mensaje);
+      await enviarTelegram(mensaje, { html: true });
     } catch (err) {
       console.warn(`No se ha podido avisar por Telegram del cierre de la jornada ${ronda.jornadaCaraACara}:`, err);
     }
   }
 }
 
+function escaparHtml(texto) {
+  return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Sin <pre>/monoespaciado a propósito: Telegram lo renderiza como "bloque
+// de código" (con su propio botón de copiar, que no queremos) y en móvil
+// corta las líneas largas por la mitad, rompiendo justo la alineación por
+// columnas que se buscaba. En su lugar: nombres de equipo en negrita para
+// que destaquen sobre los números, y cada sección dentro de un
+// <blockquote> — en Telegram eso se ve como una tarjeta con una franja
+// lateral, no como código. Sin emojis, a petición expresa.
 function construirMensajeJornadaCerrada(ronda, fixtures, results, nombrePorId, teams) {
   const fixturesJornada = fixtures.filter((f) => f.jornada === ronda.jornadaCaraACara);
   const resultadosRonda = results[ronda.id] ?? {};
@@ -60,14 +71,14 @@ function construirMensajeJornadaCerrada(ronda, fixtures, results, nombrePorId, t
   const lineasResultados = fixturesJornada.map((f) => {
     const ptsA = resultadosRonda[f.teamAId];
     const ptsB = resultadosRonda[f.teamBId];
-    const nombreA = nombrePorId.get(f.teamAId) ?? "?";
-    const nombreB = nombrePorId.get(f.teamBId) ?? "?";
-    if (ptsA == null || ptsB == null) return `${nombreA} vs ${nombreB} — sin datos`;
+    const nombreA = escaparHtml(nombrePorId.get(f.teamAId) ?? "?");
+    const nombreB = escaparHtml(nombrePorId.get(f.teamBId) ?? "?");
+    if (ptsA == null || ptsB == null) return `<b>${nombreA}</b> – <b>${nombreB}</b>: sin datos`;
 
     const puntosA = calcularPuntosEnfrentamiento(ptsA, ptsB);
     const puntosB = calcularPuntosEnfrentamiento(ptsB, ptsA);
-    const emoji = puntosA === puntosB ? "🟡" : puntosA > puntosB ? "🟢" : "🔴";
-    return `${emoji} ${nombreA} ${ptsA} - ${ptsB} ${nombreB}`;
+    const empate = puntosA === puntosB;
+    return `<b>${nombreA}</b> ${ptsA} – <b>${nombreB}</b> ${ptsB}${empate ? " (empate)" : ""}`;
   });
 
   const clasificacion = calcularClasificacion(
@@ -76,15 +87,19 @@ function construirMensajeJornadaCerrada(ronda, fixtures, results, nombrePorId, t
     results,
     ronda.jornadaCaraACara
   );
-  const lineasClasificacion = clasificacion.map((fila, i) => `${i + 1}º ${fila.team.name} — ${fila.pts} pts`);
+  const lineasClasificacion = clasificacion.map(
+    (fila, i) => `${i + 1}. ${escaparHtml(fila.team.name)} — ${fila.pts} pts`
+  );
 
   return [
-    `🏆 Jornada ${ronda.jornadaCaraACara} cerrada`,
+    `<b>Jornada ${ronda.jornadaCaraACara} cerrada</b>`,
     "",
-    "⚔️ Resultados",
-    ...lineasResultados,
+    "<b>Resultados</b>",
+    `<blockquote>${lineasResultados.join("\n")}</blockquote>`,
     "",
-    "📊 Clasificación",
-    ...lineasClasificacion,
+    "<b>Clasificación</b>",
+    `<blockquote>${lineasClasificacion.join("\n")}</blockquote>`,
+    "",
+    `<a href="https://falm.vercel.app">Ver en la app</a>`,
   ].join("\n");
 }
