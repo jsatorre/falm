@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseServer";
 import { getHistoricalRoundPoints, getLiveRoundPoints, getSeasonData, getLeagueScoreId } from "./integrations/biwenger";
 import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
+import { avisarJornadasCerradas } from "./notificacionesJornada";
 
 // El histórico de jornadas ya cerradas (12 llamadas a tu cuenta) casi
 // nunca cambia una vez cerrada la jornada — repetirlo cada 60s como la
@@ -58,6 +59,10 @@ async function syncEstadosDeJornada(seasonRounds) {
       .eq("id", cambio.id);
     if (updateError) console.warn(`No se ha podido actualizar el estado de la ronda ${cambio.id}:`, updateError);
   }
+
+  // Ids de las rondas que ACABAN de pasar a "finished" en este ciclo (no
+  // las que ya lo estaban) — para el aviso de Telegram, ver más abajo.
+  return cambios.filter((c) => c.status === "finished").map((c) => c.id);
 }
 
 /**
@@ -82,7 +87,21 @@ async function syncEstadosDeJornada(seasonRounds) {
  */
 export async function syncBiwengerResults() {
   const { rounds: seasonRounds, hayPartidosEnJuego } = await getSeasonData();
-  await syncEstadosDeJornada(seasonRounds);
+  const rondasRecienCerradas = await syncEstadosDeJornada(seasonRounds);
+
+  // El aviso va ANTES del corte por "sin partidos en juego" a propósito:
+  // si la ronda que se acaba de cerrar era el último partido en juego de
+  // toda La Liga en ese instante, hayPartidosEnJuego ya vendría a false
+  // en este mismo ciclo — y sin esto, el aviso nunca llegaría a mandarse
+  // (round_results ya tiene los puntos finales del último sync en vivo,
+  // así que no hace falta esperar al histórico para poder avisar).
+  if (rondasRecienCerradas.length > 0) {
+    try {
+      await avisarJornadasCerradas(rondasRecienCerradas);
+    } catch (err) {
+      console.warn("No se ha podido avisar por Telegram del cierre de jornada:", err);
+    }
+  }
 
   if (!hayPartidosEnJuego) return { synced: 0, motivo: "sin partidos en juego" };
 
