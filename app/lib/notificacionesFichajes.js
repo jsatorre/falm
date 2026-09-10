@@ -16,13 +16,12 @@ function escaparHtml(texto) {
  * @param {Array<{ id: string, name: string }>} teams
  */
 export async function avisarFichajesResueltos(ronda, asignaciones, teams) {
-  const jugadorPorEquipo = new Map(asignaciones.map((a) => [a.teamId, a.player]));
+  if (asignaciones.length === 0) return; // nadie ha fichado esta jornada, nada que avisar
 
-  const lineas = teams.map((t) => {
-    const nombre = escaparHtml(t.name);
-    const jugador = jugadorPorEquipo.get(t.id);
-    return jugador ? `<b>${nombre}</b> → ${escaparHtml(jugador)}` : `<b>${nombre}</b> — no ha fichado a nadie`;
-  });
+  const nombrePorId = new Map(teams.map((t) => [t.id, t.name]));
+  const lineas = asignaciones.map(
+    (a) => `<b>${escaparHtml(nombrePorId.get(a.teamId) ?? "?")}</b> → ${escaparHtml(a.player)}`
+  );
 
   const mensaje = [
     `<b>Fichajes de la Jornada ${ronda.jornadaCaraACara} resueltos</b>`,
