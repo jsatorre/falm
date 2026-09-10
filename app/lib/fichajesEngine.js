@@ -3,6 +3,7 @@ import { calcularClasificacion } from "./scoring";
 import { priorizarEquipos, asignarFichajes } from "./fichajes";
 import { getCaraACaraRounds } from "./caraACaraRounds";
 import { enviarPushEquipo } from "./push";
+import { avisarFichajesResueltos } from "./notificacionesFichajes";
 
 /**
  * Si ya pasó la hora tope de una jornada de fichajes, calcula (la primera
@@ -31,7 +32,7 @@ export async function publicarFichajesSiToca(ronda) {
     { data: fixturesRaw },
     { data: resultsRaw },
   ] = await Promise.all([
-    supabase.from("teams").select("id"),
+    supabase.from("teams").select("id, name"),
     supabase.from("team_wishlist").select("team_id, player_1, player_2").eq("round_id", ronda.id),
     rondaAnterior
       ? supabase.from("fichaje_assignments").select("team_id").eq("round_id", rondaAnterior.id)
@@ -108,6 +109,10 @@ export async function publicarFichajesSiToca(ronda) {
   } catch (err) {
     console.warn("No se han podido mandar los avisos push de fichajes:", err);
   }
+
+  // Aviso al grupo de Telegram, aparte del push individual a cada equipo
+  // — mismo criterio de "solo la primera vez" que el push de arriba.
+  await avisarFichajesResueltos(ronda, asignaciones, teams);
 
   return asignaciones.map((a) => ({ team_id: a.teamId, player: a.player }));
 }
