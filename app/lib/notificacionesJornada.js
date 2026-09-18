@@ -44,6 +44,23 @@ export async function avisarJornadasCerradas(rondaIdsRecienCerradas) {
   }
 
   for (const ronda of cerradas) {
+    // Biwenger puede marcar una ronda "finished" sin que nosotros tengamos
+    // todavía sus puntos reales — pasó de verdad: una jornada con partidos
+    // aplazados acabó repartida en un id de ronda nuevo que nuestra tabla
+    // no conocía, así que se cerró sin datos. Mejor no avisar de una
+    // "jornada cerrada" vacía que confiar en que el status ya es fiable.
+    const fixturesJornada = fixtures.filter((f) => f.jornada === ronda.jornadaCaraACara);
+    const resultadosRonda = results[ronda.id] ?? {};
+    const tieneTodosLosResultados =
+      fixturesJornada.length > 0 &&
+      fixturesJornada.every((f) => resultadosRonda[f.teamAId] != null && resultadosRonda[f.teamBId] != null);
+    if (!tieneTodosLosResultados) {
+      console.warn(
+        `Jornada ${ronda.jornadaCaraACara} marcada "finished" pero sin resultados completos todavía — no se avisa por Telegram.`
+      );
+      continue;
+    }
+
     const mensaje = construirMensajeJornadaCerrada(ronda, fixtures, results, nombrePorId, teams);
     try {
       await enviarTelegram(mensaje, { html: true });
