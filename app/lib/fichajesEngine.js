@@ -6,36 +6,28 @@ import { enviarPushEquipo } from "./push";
 import { avisarFichajesResueltos } from "./notificacionesFichajes";
 
 /**
- * Si ya pasó la hora tope de una jornada de fichajes, calcula (la primera
- * vez) o devuelve (las siguientes — es idempotente) quién ficha a quién:
- * prioridad = quien no fichó la jornada anterior primero, y entre esos el
- * peor clasificado; cada equipo se lleva su 1ª opción libre, si no la 2ª.
+ * Prioridad + reparto de una ventana de fichajes, común a la ventana normal
+ * de cada jornada y a la Ventana Extra (ver ventanaExtra.js): quien NO
+ * fichó en la ventana previa va primero y, entre esos, el peor clasificado
+ * (hasta `hastaJornada`); cada equipo se lleva su 1ª opción libre, si no la
+ * 2ª. `excluidos` son jugadores ya fichados en otra ventana que no se
+ * pueden volver a asignar.
  *
- * @param {{ id: string, jornadaCaraACara: number }} ronda
- * @returns {Promise<Array<{ team_id: string, player: string }>>}
+ * @param {{ roundIdPrevio: string|null, hastaJornada: number, wishlistPorEquipo: Record<string, [string|null, string|null]>, excluidos?: Set<string> }} opciones
+ * @returns {Promise<{ asignaciones: Array<{ teamId: string, player: string }>, teams: Array<{ id: string, name: string }> }>}
  */
-export async function publicarFichajesSiToca(ronda) {
-  const { data: existentes, error: existentesError } = await supabase
-    .from("fichaje_assignments")
-    .select("team_id, player")
-    .eq("round_id", ronda.id);
-  if (existentesError) throw existentesError;
-  if (existentes.length > 0) return existentes;
-
+export async function calcularAsignaciones({ roundIdPrevio, hastaJornada, wishlistPorEquipo, excluidos = new Set() }) {
   const rounds = await getCaraACaraRounds();
-  const rondaAnterior = rounds.find((r) => r.jornadaCaraACara === ronda.jornadaCaraACara - 1);
 
   const [
     { data: teams },
-    { data: wishlistRaw },
     { data: asignacionesAnteriores },
     { data: fixturesRaw },
     { data: resultsRaw },
   ] = await Promise.all([
     supabase.from("teams").select("id, name"),
-    supabase.from("team_wishlist").select("team_id, player_1, player_2").eq("round_id", ronda.id),
-    rondaAnterior
-      ? supabase.from("fichaje_assignments").select("team_id").eq("round_id", rondaAnterior.id)
+    roundIdPrevio
+      ? supabase.from("fichaje_assignments").select("team_id").eq("round_id", roundIdPrevio)
       : Promise.resolve({ data: [] }),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
     supabase.from("round_results").select("round_id, team_id, biwenger_points"),
@@ -59,18 +51,17 @@ export async function publicarFichajesSiToca(ronda) {
     results[r.round_id][r.team_id] = r.biwenger_points;
   }
 
-  const equiposClasificacion = teams.map((t) => ({ id: t.id }));
   const clasificacion = calcularClasificacion(
-    equiposClasificacion,
+    teams.map((t) => ({ id: t.id })),
     fixtures,
     results,
-    ronda.jornadaCaraACara - 1
+    hastaJornada
   );
   const posicionPorEquipoId = new Map(clasificacion.map((fila, i) => [fila.team.id, i + 1]));
 
-  const wishlistPorEquipo = {};
-  for (const w of wishlistRaw) {
-    wishlistPorEquipo[w.team_id] = [w.player_1, w.player_2];
+  const wishlistFiltrada = {};
+  for (const [teamId, opciones] of Object.entries(wishlistPorEquipo)) {
+    wishlistFiltrada[teamId] = opciones.map((p) => (p && !excluidos.has(p) ? p : null));
   }
 
   const equiposParaPriorizar = teams.map((t) => ({
@@ -80,28 +71,33 @@ export async function publicarFichajesSiToca(ronda) {
   }));
 
   const priorizados = priorizarEquipos(equiposParaPriorizar);
-  const asignaciones = asignarFichajes(priorizados, wishlistPorEquipo);
+  return { asignaciones: asignarFichajes(priorizados, wishlistFiltrada), teams };
+}
 
-  if (asignaciones.length > 0) {
-    const { error: insertError } = await supabase
-      .from("fichaje_assignments")
-      .insert(asignaciones.map((a) => ({ round_id: ronda.id, team_id: a.teamId, player: a.player })));
-    if (insertError) throw insertError;
-  }
-
-  // Aviso push a todos los equipos — esto solo se ejecuta la primera vez
-  // que se calculan los fichajes de esta jornada (la siguiente vez que se
-  // llame, el early return de arriba ya no vuelve a pasar por aquí), así
-  // que nunca se manda dos veces el mismo aviso. Un fallo al notificar no
-  // debe tirar abajo el cálculo de fichajes en sí.
+/**
+ * Avisa del resultado de una ventana de fichajes: push a cada equipo (un
+ * fallo no debe tirar el cálculo en sí) y mensaje al grupo de Telegram.
+ * Solo se llama la primera vez que se calcula una ventana, así que no se
+ * repite.
+ *
+ * @param {{ jornadaCaraACara: number }} ronda
+ * @param {Array<{ teamId: string, player: string }>} asignaciones
+ * @param {Array<{ id: string, name: string }>} teams
+ * @param {boolean} esExtra
+ */
+export async function avisarVentanaResuelta(ronda, asignaciones, teams, esExtra = false) {
   try {
     const jugadorPorEquipo = new Map(asignaciones.map((a) => [a.teamId, a.player]));
     await Promise.all(
       teams.map((t) => {
         const jugador = jugadorPorEquipo.get(t.id);
         return enviarPushEquipo(t.id, {
-          title: "Fichajes resueltos",
-          body: jugador ? `Te has llevado a ${jugador}` : "No has fichado a nadie esta jornada",
+          title: esExtra ? "Fichajes de la Ventana Extra resueltos" : "Fichajes resueltos",
+          body: jugador
+            ? `Te has llevado a ${jugador}`
+            : esExtra
+              ? "No has fichado a nadie en la Ventana Extra"
+              : "No has fichado a nadie esta jornada",
           url: "/fichajes",
         });
       })
@@ -110,9 +106,57 @@ export async function publicarFichajesSiToca(ronda) {
     console.warn("No se han podido mandar los avisos push de fichajes:", err);
   }
 
-  // Aviso al grupo de Telegram, aparte del push individual a cada equipo
-  // — mismo criterio de "solo la primera vez" que el push de arriba.
-  await avisarFichajesResueltos(ronda, asignaciones, teams);
+  await avisarFichajesResueltos(ronda, asignaciones, teams, esExtra);
+}
+
+/**
+ * Si ya pasó la hora tope de una jornada de fichajes, calcula (la primera
+ * vez) o devuelve (las siguientes — es idempotente) quién ficha a quién:
+ * prioridad = quien no fichó la jornada anterior primero, y entre esos el
+ * peor clasificado; cada equipo se lleva su 1ª opción libre, si no la 2ª.
+ *
+ * @param {{ id: string, jornadaCaraACara: number }} ronda
+ * @returns {Promise<Array<{ team_id: string, player: string }>>}
+ */
+export async function publicarFichajesSiToca(ronda) {
+  const { data: existentes, error: existentesError } = await supabase
+    .from("fichaje_assignments")
+    .select("team_id, player")
+    .eq("round_id", ronda.id);
+  if (existentesError) throw existentesError;
+  if (existentes.length > 0) return existentes;
+
+  const rounds = await getCaraACaraRounds();
+  const rondaAnterior = rounds.find((r) => r.jornadaCaraACara === ronda.jornadaCaraACara - 1);
+
+  const { data: wishlistRaw, error: wishlistError } = await supabase
+    .from("team_wishlist")
+    .select("team_id, player_1, player_2")
+    .eq("round_id", ronda.id);
+  if (wishlistError) throw wishlistError;
+
+  const wishlistPorEquipo = {};
+  for (const w of wishlistRaw) {
+    wishlistPorEquipo[w.team_id] = [w.player_1, w.player_2];
+  }
+
+  const { asignaciones, teams } = await calcularAsignaciones({
+    roundIdPrevio: rondaAnterior?.id ?? null,
+    hastaJornada: ronda.jornadaCaraACara - 1,
+    wishlistPorEquipo,
+  });
+
+  if (asignaciones.length > 0) {
+    const { error: insertError } = await supabase
+      .from("fichaje_assignments")
+      .insert(asignaciones.map((a) => ({ round_id: ronda.id, team_id: a.teamId, player: a.player })));
+    if (insertError) throw insertError;
+  }
+
+  // Esto solo se ejecuta la primera vez que se calculan los fichajes de
+  // esta jornada (la siguiente vez, el early return de arriba ya no pasa
+  // por aquí), así que nunca se manda dos veces el mismo aviso.
+  await avisarVentanaResuelta(ronda, asignaciones, teams);
 
   return asignaciones.map((a) => ({ team_id: a.teamId, player: a.player }));
 }

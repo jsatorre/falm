@@ -14,8 +14,9 @@ function escaparHtml(texto) {
  * @param {{ jornadaCaraACara: number }} ronda
  * @param {Array<{ teamId: string, player: string }>} asignaciones
  * @param {Array<{ id: string, name: string }>} teams
+ * @param {boolean} esExtra  true si es una Ventana Extra (no la de una jornada)
  */
-export async function avisarFichajesResueltos(ronda, asignaciones, teams) {
+export async function avisarFichajesResueltos(ronda, asignaciones, teams, esExtra = false) {
   if (asignaciones.length === 0) return; // nadie ha fichado esta jornada, nada que avisar
 
   const nombrePorId = new Map(teams.map((t) => [t.id, t.name]));
@@ -23,8 +24,10 @@ export async function avisarFichajesResueltos(ronda, asignaciones, teams) {
     (a) => `<b>${escaparHtml(nombrePorId.get(a.teamId) ?? "?")}</b> → ${escaparHtml(a.player)}`
   );
 
+  const titulo = esExtra ? "Fichajes de la Ventana Extra resueltos" : `Fichajes de la Jornada ${ronda.jornadaCaraACara} resueltos`;
+
   const mensaje = [
-    `<b>Fichajes de la Jornada ${ronda.jornadaCaraACara} resueltos</b>`,
+    `<b>${titulo}</b>`,
     "",
     `<blockquote>${lineas.join("\n")}</blockquote>`,
     "",
@@ -36,6 +39,6 @@ export async function avisarFichajesResueltos(ronda, asignaciones, teams) {
   try {
     await enviarTelegram(mensaje, { html: true });
   } catch (err) {
-    console.warn(`No se ha podido avisar por Telegram de los fichajes de la jornada ${ronda.jornadaCaraACara}:`, err);
+    console.warn(`No se ha podido avisar por Telegram de los fichajes (${esExtra ? "ventana extra" : `jornada ${ronda.jornadaCaraACara}`}):`, err);
   }
 }

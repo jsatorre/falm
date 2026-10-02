@@ -5,6 +5,7 @@ import { getLiquidacionGuardada } from "../lib/dineroConfig";
 import { supabase } from "../lib/supabaseServer";
 import AplazarJornadaForm from "./AplazarJornadaForm";
 import FichajesDeadlineForm from "./FichajesDeadlineForm";
+import FichajesExtraForm from "./FichajesExtraForm";
 import DraftAdminForm from "./DraftAdminForm";
 import DineroConfigForm from "./DineroConfigForm";
 import CalcularDeudasForm from "./CalcularDeudasForm";
@@ -53,6 +54,19 @@ export default async function AdminPage() {
           jornada ya toma la hora tope de la semana siguiente.
         </p>
         <FichajesDeadlineForm />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Ventana Extra de fichajes
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Para las semanas en las que hay mercado pero no se cierra ninguna jornada de Liga (parón
+          de selecciones...). Abre una ventana aparte, elige tú cuándo termina y, pasada esa hora,
+          se publican los fichajes igual que siempre. Solo se puede abrir cuando la ventana normal
+          de la jornada ya ha cerrado, y desaparece sola en cuanto esa jornada se juega.
+        </p>
+        <FichajesExtraForm />
       </section>
 
       <section className="mb-8">

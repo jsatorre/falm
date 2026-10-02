@@ -3,6 +3,14 @@ import { supabase } from "../../lib/supabaseServer";
 import { getCaraACaraRounds } from "../../lib/caraACaraRounds";
 import { publicarFichajesSiToca, deadlinePasada, asegurarDeadlineFichajes } from "../../lib/fichajesEngine";
 import { getJugadoresLibres } from "../../lib/fichajePool";
+import {
+  getVentanaExtra,
+  deadlineExtraPasada,
+  publicarVentanaExtraSiToca,
+  leerWishlistExtra,
+  guardarWishlistExtra,
+  fichadosEnVentanaNormal,
+} from "../../lib/ventanaExtra";
 
 function equipoAutenticado(request) {
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
@@ -21,6 +29,53 @@ async function rondaDeFichajesActual() {
   return asegurarDeadlineFichajes(ronda);
 }
 
+async function respuestaVentanaExtra(ronda, extra, teamId) {
+  if (extra.asignaciones || deadlineExtraPasada(extra)) {
+    const asignaciones = await publicarVentanaExtraSiToca(ronda, extra);
+    const { data: teams } = await supabase.from("teams").select("id, name, crest_url");
+    const equipoPorId = Object.fromEntries(teams.map((t) => [t.id, t]));
+
+    return Response.json({
+      esExtra: true,
+      cerrado: false,
+      publicado: true,
+      deadline: extra.deadline,
+      asignaciones: asignaciones.map((a) => ({
+        team: equipoPorId[a.team_id] ?? null,
+        player: a.player,
+        esTuyo: a.team_id === teamId,
+      })),
+    });
+  }
+
+  const { player1, player2 } = await leerWishlistExtra(teamId);
+
+  // Mismo criterio que la ventana normal (lista de libres de Biwenger, con
+  // aviso si falla), pero cacheada por Extra — no por jornada, que ya tuvo
+  // su propia lista — y sin los jugadores que ya se llevaron esta semana.
+  let jugadoresLibres = [];
+  let libresError = false;
+  try {
+    const yaFichados = await fichadosEnVentanaNormal(ronda);
+    const libres = await getJugadoresLibres(`extra-${extra.abiertaAt}`);
+    jugadoresLibres = libres.filter((j) => !yaFichados.has(j.nombre));
+  } catch (err) {
+    console.warn("No se ha podido cargar la lista de jugadores libres para la Ventana Extra:", err);
+    libresError = true;
+  }
+
+  return Response.json({
+    esExtra: true,
+    player1,
+    player2,
+    cerrado: false,
+    publicado: false,
+    deadline: extra.deadline,
+    jugadoresLibres,
+    libresError,
+  });
+}
+
 export async function GET(request) {
   const teamId = equipoAutenticado(request);
   if (!teamId) {
@@ -31,6 +86,11 @@ export async function GET(request) {
   if (!ronda) {
     return Response.json({ player1: "", player2: "", cerrado: true, publicado: false });
   }
+
+  // Si el admin ha abierto una Ventana Extra sobre esta jornada, es la que
+  // manda hasta que la jornada se cierre (ver ventanaExtra.js).
+  const extra = await getVentanaExtra(ronda);
+  if (extra) return respuestaVentanaExtra(ronda, extra, teamId);
 
   if (deadlinePasada(ronda)) {
     const asignaciones = await publicarFichajesSiToca(ronda);
@@ -91,6 +151,17 @@ export async function POST(request) {
   if (!ronda) {
     return Response.json({ error: "No hay ventana de fichajes abierta" }, { status: 409 });
   }
+
+  const extra = await getVentanaExtra(ronda);
+  if (extra) {
+    if (extra.asignaciones || deadlineExtraPasada(extra)) {
+      return Response.json({ error: "Ya se ha cerrado la Ventana Extra" }, { status: 409 });
+    }
+    const cuerpo = await request.json();
+    await guardarWishlistExtra(teamId, (cuerpo.player1 ?? "").trim() || null, (cuerpo.player2 ?? "").trim() || null);
+    return Response.json({ ok: true });
+  }
+
   if (deadlinePasada(ronda)) {
     return Response.json({ error: "Ya se ha cerrado la ventana de fichajes de esta jornada" }, { status: 409 });
   }
