@@ -1,3 +1,19 @@
+import { supabase } from "./supabaseServer";
+
+// Vercel no deja los logs a mano, así que el resultado del último envío se
+// guarda en app_settings: si un aviso no llega al grupo, aquí se ve por qué
+// (ver /api/admin/telegram-estado).
+async function registrarEnvio(ok, detalle) {
+  try {
+    await supabase.from("app_settings").upsert({
+      key: "telegram_ultimo_envio",
+      value: JSON.stringify({ at: new Date().toISOString(), ok, detalle }),
+    });
+  } catch {
+    // el registro es solo diagnóstico, nunca debe romper el aviso
+  }
+}
+
 /**
  * Aviso a un grupo de Telegram cuando se cierra una jornada — necesita un
  * bot creado con @BotFather (TELEGRAM_BOT_TOKEN) añadido al grupo, y el
@@ -6,10 +22,11 @@
  * configurado).
  */
 export async function enviarTelegram(texto, { html = false } = {}) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
   if (!token || !chatId) {
     console.warn("Telegram no configurado (falta TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID) — no se manda el aviso");
+    await registrarEnvio(false, "Faltan variables de entorno: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID");
     return;
   }
 
@@ -24,6 +41,10 @@ export async function enviarTelegram(texto, { html = false } = {}) {
     }),
   });
   if (!res.ok) {
-    console.warn("No se ha podido enviar el aviso de Telegram:", await res.text());
+    const cuerpo = await res.text();
+    console.warn("No se ha podido enviar el aviso de Telegram:", cuerpo);
+    await registrarEnvio(false, `${res.status}: ${cuerpo}`);
+    return;
   }
+  await registrarEnvio(true, texto.split("\n")[0]);
 }

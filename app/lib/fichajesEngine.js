@@ -86,6 +86,10 @@ export async function calcularAsignaciones({ roundIdPrevio, hastaJornada, wishli
  * @param {boolean} esExtra
  */
 export async function avisarVentanaResuelta(ronda, asignaciones, teams, esExtra = false) {
+  // Primero el grupo de Telegram: es lo que más se echa en falta si algo
+  // falla, y no depende de cuántos dispositivos haya que avisar por push.
+  await avisarFichajesResueltos(ronda, asignaciones, teams, esExtra);
+
   try {
     const jugadorPorEquipo = new Map(asignaciones.map((a) => [a.teamId, a.player]));
     await Promise.all(
@@ -106,7 +110,6 @@ export async function avisarVentanaResuelta(ronda, asignaciones, teams, esExtra 
     console.warn("No se han podido mandar los avisos push de fichajes:", err);
   }
 
-  await avisarFichajesResueltos(ronda, asignaciones, teams, esExtra);
 }
 
 /**
