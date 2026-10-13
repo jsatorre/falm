@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabaseServer";
 import AplazarJornadaForm from "./AplazarJornadaForm";
 import FichajesDeadlineForm from "./FichajesDeadlineForm";
 import FichajesExtraForm from "./FichajesExtraForm";
+import ResultadoManualForm from "./ResultadoManualForm";
 import DraftAdminForm from "./DraftAdminForm";
 import DineroConfigForm from "./DineroConfigForm";
 import CalcularDeudasForm from "./CalcularDeudasForm";
@@ -41,6 +42,18 @@ export default async function AdminPage() {
           la numeración interna (Jornada 1, 2, 3...) se recalcula sola, no hace falta tocar nada más.
         </p>
         <AplazarJornadaForm />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Resultado manual de una jornada
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Para cuando Biwenger toca los puntos de una jornada y no queremos que cuenten (p.ej. un
+          partido aplazado con cambios automáticos). Bloquea la jornada, escribe tú los puntos de
+          cada equipo y la sincronización con Biwenger deja de pisarlos hasta que la desbloquees.
+        </p>
+        <ResultadoManualForm />
       </section>
 
       <section className="mb-8">

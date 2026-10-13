@@ -2,6 +2,7 @@ import { supabase } from "./supabaseServer";
 import { getHistoricalRoundPoints, getLiveRoundPoints, getSeasonData, getLeagueScoreId } from "./integrations/biwenger";
 import { getCaraACaraRounds, elegirRondaEnDirecto } from "./caraACaraRounds";
 import { avisarJornadasCerradas } from "./notificacionesJornada";
+import { getRondasBloqueadas } from "./jornadasManuales";
 
 // El histórico de jornadas ya cerradas (12 llamadas a tu cuenta) casi
 // nunca cambia una vez cerrada la jornada — repetirlo cada 60s como la
@@ -88,6 +89,10 @@ async function syncEstadosDeJornada(seasonRounds) {
 export async function syncBiwengerResults() {
   const { rounds: seasonRounds, hayPartidosEnJuego } = await getSeasonData();
   const rondasRecienCerradas = await syncEstadosDeJornada(seasonRounds);
+  // Jornadas con los puntos fijados a mano en /admin: ni se avisa de su
+  // cierre (los puntos aún no son los buenos) ni se vuelcan datos de
+  // Biwenger sobre ellas — ver jornadasManuales.js.
+  const bloqueadas = await getRondasBloqueadas();
 
   // El aviso va ANTES del corte por "sin partidos en juego" a propósito:
   // si la ronda que se acaba de cerrar era el último partido en juego de
@@ -95,9 +100,10 @@ export async function syncBiwengerResults() {
   // en este mismo ciclo — y sin esto, el aviso nunca llegaría a mandarse
   // (round_results ya tiene los puntos finales del último sync en vivo,
   // así que no hace falta esperar al histórico para poder avisar).
-  if (rondasRecienCerradas.length > 0) {
+  const rondasParaAvisar = rondasRecienCerradas.filter((id) => !bloqueadas.has(id));
+  if (rondasParaAvisar.length > 0) {
     try {
-      await avisarJornadasCerradas(rondasRecienCerradas);
+      await avisarJornadasCerradas(rondasParaAvisar);
     } catch (err) {
       console.warn("No se ha podido avisar por Telegram del cierre de jornada:", err);
     }
@@ -160,8 +166,12 @@ export async function syncBiwengerResults() {
   // concreta (que ahí vendría vacío de todas formas mientras siga abierta).
   const caraACaraRounds = await getCaraACaraRounds();
   const rondaEnDirecto = elegirRondaEnDirecto(caraACaraRounds);
-  if (rondaEnDirecto) {
-    const roundId = roundIdPorBiwengerId.get(String(rondaEnDirecto.biwenger_round_id));
+  const roundIdEnDirecto = rondaEnDirecto
+    ? roundIdPorBiwengerId.get(String(rondaEnDirecto.biwenger_round_id))
+    : null;
+  // Si está bloqueada (puntos a mano) ni se gasta la llamada: no se iba a usar.
+  if (rondaEnDirecto && !bloqueadas.has(roundIdEnDirecto)) {
+    const roundId = roundIdEnDirecto;
     const scoreId = await getLeagueScoreId();
     const puntosEnVivo = await getLiveRoundPoints(rondaEnDirecto.biwenger_round_id, scoreId);
 
@@ -173,7 +183,7 @@ export async function syncBiwengerResults() {
     }
   }
 
-  const filas = [...filasPorClave.values()];
+  const filas = [...filasPorClave.values()].filter((f) => !bloqueadas.has(f.round_id));
 
   if (filas.length === 0) return { synced: 0 };
 
