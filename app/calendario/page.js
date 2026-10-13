@@ -1,10 +1,12 @@
 import { supabase } from "../lib/supabaseServer";
 import { getCaraACaraRounds } from "../lib/caraACaraRounds";
+import { getRondasBloqueadas } from "../lib/jornadasManuales";
 import { calcularPuntosEnfrentamiento } from "../lib/scoring";
 
 export default async function CalendarioPage() {
-  const [rounds, { data: teams }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
+  const [rounds, bloqueadas, { data: teams }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
     getCaraACaraRounds(),
+    getRondasBloqueadas(),
     supabase.from("teams").select("id, name, crest_url"),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
     supabase.from("round_results").select("round_id, team_id, biwenger_points"),
@@ -38,7 +40,13 @@ export default async function CalendarioPage() {
             <section key={ronda.id}>
               <div className="mb-2 flex items-center gap-2">
                 <h2 className="text-sm font-bold text-foreground">Jornada {ronda.jornadaCaraACara}</h2>
-                {ronda.status === "finished" ? (
+                {bloqueadas.has(ronda.id) && !fixtures.every((f) => puntos[f.team_a_id] != null && puntos[f.team_b_id] != null) ? (
+                  // Bloqueada a mano en /admin y sin sus puntos definitivos
+                  // todavía (p.ej. con un partido aplazado por jugar).
+                  <span className="rounded-full bg-neon-orange/10 px-2 py-0.5 text-[10px] font-medium text-neon-orange">
+                    aplazada
+                  </span>
+                ) : ronda.status === "finished" ? (
                   <span className="rounded-full bg-neon-green/10 px-2 py-0.5 text-[10px] font-medium text-neon-green">
                     cerrada
                   </span>
