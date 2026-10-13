@@ -53,6 +53,19 @@ export async function POST(request) {
     return Response.json({ ok: true });
   }
 
+  if (accion === "vaciar") {
+    // Borra los puntos de la jornada para que no cuente en la clasificación
+    // hasta que se escriban los buenos. Solo bloqueada: si no, el sync los
+    // volvería a traer de Biwenger al instante.
+    const bloqueadas = await getRondasBloqueadas();
+    if (!bloqueadas.has(roundId)) {
+      return Response.json({ error: "Bloquea la jornada antes de vaciar sus puntos" }, { status: 409 });
+    }
+    const { error } = await supabase.from("round_results").delete().eq("round_id", roundId);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ ok: true });
+  }
+
   if (accion === "guardar") {
     // Solo con la jornada bloqueada: si no, el siguiente sync pisaría lo escrito.
     const bloqueadas = await getRondasBloqueadas();

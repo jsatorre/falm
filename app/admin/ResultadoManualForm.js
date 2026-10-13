@@ -72,7 +72,9 @@ export default function ResultadoManualForm() {
           ? "Jornada bloqueada: la sincronización con Biwenger ya no la toca."
           : accion === "desbloquear"
             ? "Jornada desbloqueada: vuelve a sincronizarse con Biwenger."
-            : `Puntos guardados (${data.guardados} equipos).`
+            : accion === "vaciar"
+              ? "Puntos vaciados: la jornada ya no cuenta en la clasificación hasta que guardes los buenos."
+              : `Puntos guardados (${data.guardados} equipos).`
       );
     } catch {
       setError("No se ha podido completar la acción");
@@ -154,6 +156,18 @@ export default function ResultadoManualForm() {
               className="rounded-lg bg-neon-green px-4 py-2 text-sm font-semibold text-black disabled:opacity-40"
             >
               {enviando ? "Guardando…" : "Guardar puntos"}
+            </button>
+            <button
+              type="button"
+              disabled={enviando}
+              onClick={() => {
+                if (window.confirm("¿Vaciar los puntos de esta jornada? Dejará de contar en la clasificación hasta que guardes los buenos.")) {
+                  enviar("vaciar");
+                }
+              }}
+              className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-neon-pink disabled:opacity-40"
+            >
+              Vaciar puntos
             </button>
             <button
               type="button"

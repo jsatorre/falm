@@ -1,6 +1,7 @@
 import { calcularClasificacion } from "./lib/scoring";
 import { supabase } from "./lib/supabaseServer";
 import { getCaraACaraRounds } from "./lib/caraACaraRounds";
+import { getRondasBloqueadas } from "./lib/jornadasManuales";
 import CelebrateButton from "./components/CelebrateButton";
 
 const MEDALLAS = ["🥇", "🥈", "🥉"];
@@ -46,8 +47,9 @@ function Racha({ resultados }) {
 }
 
 export default async function ClasificacionPage() {
-  const [rounds, { data: teams }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
+  const [rounds, bloqueadas, { data: teams }, { data: fixturesRaw }, { data: resultsRaw }] = await Promise.all([
     getCaraACaraRounds(),
+    getRondasBloqueadas(),
     supabase.from("teams").select("id, name, crest_url"),
     supabase.from("fixtures").select("round_id, team_a_id, team_b_id"),
     supabase.from("round_results").select("round_id, team_id, biwenger_points, synced_at"),
@@ -97,7 +99,13 @@ export default async function ClasificacionPage() {
   // anterior) — en ese caso la clasificación es provisional: puede haber
   // partidos de esa jornada que todavía no han terminado y que la moverán.
   const rondaUltimaJornada = rounds.find((r) => r.jornadaCaraACara === ultimaJornadaConDatos);
-  const esProvisional = ultimaJornadaConDatos > 0 && rondaUltimaJornada?.status !== "finished";
+  // Una jornada con los puntos fijados a mano en /admin no está "en juego"
+  // aunque Biwenger la siga dando por abierta (p.ej. con un partido
+  // aplazado pendiente): sus puntos son los que ha escrito el admin.
+  const esProvisional =
+    ultimaJornadaConDatos > 0 &&
+    rondaUltimaJornada?.status !== "finished" &&
+    !bloqueadas.has(rondaUltimaJornada?.id);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
