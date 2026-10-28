@@ -7,6 +7,7 @@ import AplazarJornadaForm from "./AplazarJornadaForm";
 import FichajesDeadlineForm from "./FichajesDeadlineForm";
 import FichajesExtraForm from "./FichajesExtraForm";
 import ResultadoManualForm from "./ResultadoManualForm";
+import ConciliarPuntosForm from "./ConciliarPuntosForm";
 import DraftAdminForm from "./DraftAdminForm";
 import DineroConfigForm from "./DineroConfigForm";
 import CalcularDeudasForm from "./CalcularDeudasForm";
@@ -54,6 +55,18 @@ export default async function AdminPage() {
           cada equipo y la sincronización con Biwenger deja de pisarlos hasta que la desbloquees.
         </p>
         <ResultadoManualForm />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">
+          Puntos oficiales de Biwenger
+        </h2>
+        <p className="mb-3 text-xs text-muted">
+          Vuelve a traer de Biwenger los puntos finales de todas las jornadas ya cerradas y corrige
+          los que no coincidan (p.ej. si una jornada se cerró con números a medias). No toca las
+          jornadas bloqueadas a mano.
+        </p>
+        <ConciliarPuntosForm />
       </section>
 
       <section className="mb-8">

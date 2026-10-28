@@ -12,9 +12,9 @@ import { getRondasBloqueadas } from "./jornadasManuales";
 const HISTORICO_CACHE_MS = 20 * 60 * 1000;
 let historicoCache = null; // { ts, promise }
 
-function getHistoricoCacheado(teamIds) {
+function getHistoricoCacheado(teamIds, saltarCache = false) {
   const ahora = Date.now();
-  if (!historicoCache || ahora - historicoCache.ts > HISTORICO_CACHE_MS) {
+  if (saltarCache || !historicoCache || ahora - historicoCache.ts > HISTORICO_CACHE_MS) {
     historicoCache = { ts: ahora, promise: getHistoricalRoundPoints(teamIds) };
   }
   return historicoCache.promise;
@@ -86,22 +86,44 @@ async function syncEstadosDeJornada(seasonRounds) {
  * arranca un partido se detecta de inmediato — no hay ninguna ventana en la
  * que nos podamos "perder" el inicio de una jornada.
  */
-export async function syncBiwengerResults() {
+export async function syncBiwengerResults({ forzarHistorico = false } = {}) {
   const { rounds: seasonRounds, hayPartidosEnJuego } = await getSeasonData();
   const rondasRecienCerradas = await syncEstadosDeJornada(seasonRounds);
   // Jornadas con los puntos fijados a mano en /admin: ni se avisa de su
   // cierre (los puntos aún no son los buenos) ni se vuelcan datos de
   // Biwenger sobre ellas — ver jornadasManuales.js.
   const bloqueadas = await getRondasBloqueadas();
-
-  // El aviso va ANTES del corte por "sin partidos en juego" a propósito:
-  // si la ronda que se acaba de cerrar era el último partido en juego de
-  // toda La Liga en ese instante, hayPartidosEnJuego ya vendría a false
-  // en este mismo ciclo — y sin esto, el aviso nunca llegaría a mandarse
-  // (round_results ya tiene los puntos finales del último sync en vivo,
-  // así que no hace falta esperar al histórico para poder avisar).
   const rondasParaAvisar = rondasRecienCerradas.filter((id) => !bloqueadas.has(id));
+
+  // Cuando una jornada se cierra, hay que traer los puntos OFICIALES de
+  // Biwenger aunque ya no quede ningún partido en juego: el último volcado
+  // en vivo puede ser de horas antes de que terminara el último partido (el
+  // sync solo corre cuando alguien abre la app), y fiarse de él dejó una
+  // jornada con 8 de 12 equipos mal puntuados — y avisada así por Telegram.
+  // Tampoco se usa la caché del histórico en ese caso.
+  const hayCierres = rondasRecienCerradas.length > 0;
+  if (!hayPartidosEnJuego && !hayCierres && !forzarHistorico) {
+    return { synced: 0, motivo: "sin partidos en juego" };
+  }
+
+  let resultado = null;
+  let errorSync = null;
+  try {
+    resultado = await volcarResultados({
+      bloqueadas,
+      conLive: hayPartidosEnJuego,
+      saltarCache: hayCierres || forzarHistorico,
+    });
+  } catch (err) {
+    errorSync = err;
+  }
+
+  // El aviso sale DESPUÉS de volcar los puntos oficiales (para que el
+  // mensaje lleve los buenos), y sale igualmente si el volcado falló: la
+  // ronda ya figura como "finished" y no volvería a contar como recién
+  // cerrada, así que el aviso se perdería para siempre.
   if (rondasParaAvisar.length > 0) {
+    if (errorSync) console.warn("Aviso de cierre con los puntos que había: el volcado de Biwenger falló", errorSync);
     try {
       await avisarJornadasCerradas(rondasParaAvisar);
     } catch (err) {
@@ -109,8 +131,11 @@ export async function syncBiwengerResults() {
     }
   }
 
-  if (!hayPartidosEnJuego) return { synced: 0, motivo: "sin partidos en juego" };
+  if (errorSync) throw errorSync;
+  return resultado;
+}
 
+async function volcarResultados({ bloqueadas, conLive, saltarCache }) {
   const { data: teams, error: teamsError } = await supabase
     .from("teams")
     .select("id, biwenger_user_id");
@@ -126,7 +151,7 @@ export async function syncBiwengerResults() {
 
   // Histórico de jornadas ya cerradas — 12 llamadas, pero con su propia
   // caché larga (ver getHistoricoCacheado), no se repiten en cada ciclo.
-  const puntosPorJornadaBiwenger = await getHistoricoCacheado(teamIds);
+  const puntosPorJornadaBiwenger = await getHistoricoCacheado(teamIds, saltarCache);
 
   // Un Map por "round_id:team_id" en vez de un array — así, si alguna vez
   // el histórico y el cálculo en vivo coincidieran en la misma ronda (no
@@ -170,7 +195,7 @@ export async function syncBiwengerResults() {
     ? roundIdPorBiwengerId.get(String(rondaEnDirecto.biwenger_round_id))
     : null;
   // Si está bloqueada (puntos a mano) ni se gasta la llamada: no se iba a usar.
-  if (rondaEnDirecto && !bloqueadas.has(roundIdEnDirecto)) {
+  if (conLive && rondaEnDirecto && !bloqueadas.has(roundIdEnDirecto)) {
     const roundId = roundIdEnDirecto;
     const scoreId = await getLeagueScoreId();
     const puntosEnVivo = await getLiveRoundPoints(rondaEnDirecto.biwenger_round_id, scoreId);

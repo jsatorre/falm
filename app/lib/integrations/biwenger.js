@@ -6,6 +6,20 @@ const BASE = "https://biwenger.as.com/api/v2";
 
 let tokenCache = null; // { token, obtainedAt }
 
+// Versión de la app web de Biwenger que mandamos en cada llamada. Biwenger
+// rechaza con 400 "Old version" cualquier versión por debajo de la que está
+// desplegada (pasó con la 631: dejó de traer datos y los puntos de una
+// jornada se quedaron mal sin que nada avisara). Se puede fijar con
+// BIWENGER_APP_VERSION, y si aun así se queda corta, al recibir "Old
+// version" sube sola de una en una (hasta VERSIONES_MAX_REINTENTOS) en
+// lugar de esperar a que alguien lo note.
+let versionApp = Number(process.env.BIWENGER_APP_VERSION) || 632;
+const VERSIONES_MAX_REINTENTOS = 8;
+
+function esVersionAntigua(status, cuerpo) {
+  return status === 400 && /old version/i.test(cuerpo);
+}
+
 async function login() {
   const res = await fetch(`${BASE}/auth/login`, {
     method: "POST",
@@ -30,24 +44,31 @@ async function headers() {
     "X-League": process.env.BIWENGER_LEAGUE_ID,
     "X-User": process.env.BIWENGER_USER_ID,
     "X-Lang": "es",
-    "X-Version": "631",
+    "X-Version": String(versionApp),
     Accept: "application/json",
   };
 }
 
-async function biwengerFetch(path, reintentado = false, intentos429 = 0) {
+async function biwengerFetch(path, reintentado = false, intentos429 = 0, intentosVersion = 0) {
   const res = await fetch(`${BASE}${path}`, { headers: await headers() });
 
   if (res.status === 401 && !reintentado) {
     tokenCache = null; // fuerza relogin
-    return biwengerFetch(path, true, intentos429);
+    return biwengerFetch(path, true, intentos429, intentosVersion);
+  }
+  if (res.status === 400 && intentosVersion < VERSIONES_MAX_REINTENTOS) {
+    if (esVersionAntigua(res.status, await res.clone().text())) {
+      versionApp += 1;
+      console.warn(`Biwenger rechaza la versión de la app ("Old version") — probando con la ${versionApp}`);
+      return biwengerFetch(path, reintentado, intentos429, intentosVersion + 1);
+    }
   }
   // 429: Biwenger nos está limitando (típico cuando se lanzan varias
   // llamadas en paralelo, p.ej. las 12 plantillas del draft) — un par de
   // reintentos con espera corta suele bastar, en vez de tumbar la página.
   if (res.status === 429 && intentos429 < 2) {
     await new Promise((r) => setTimeout(r, 400 * (intentos429 + 1)));
-    return biwengerFetch(path, reintentado, intentos429 + 1);
+    return biwengerFetch(path, reintentado, intentos429 + 1, intentosVersion);
   }
   if (!res.ok) {
     throw new Error(`Biwenger ${path} -> ${res.status}`);
@@ -152,7 +173,7 @@ export async function getHistoricalRoundPoints(teamIds) {
  * ficha individual de un jugador: mismas rawStats exactas (score3, mvp,
  * win, goals...).
  */
-async function getReportesRondaActual(scoreId, intentos429 = 0) {
+async function getReportesRondaActual(scoreId, intentos429 = 0, intentosVersion = 0) {
   // El parámetro `score` es obligatorio: sin él (probado sin querer)
   // Biwenger devuelve otra forma de respuesta con las rawStats vacías y
   // todos los jugadores a 0 puntos, aunque el partido ya haya terminado.
@@ -160,9 +181,16 @@ async function getReportesRondaActual(scoreId, intentos429 = 0) {
   // capturada de una sesión real) — se incluye para pedir exactamente la
   // misma forma de respuesta que ya se verificó dato a dato como correcta.
   const res = await fetch(
-    `https://cf.biwenger.com/api/v2/rounds/la-liga?score=${scoreId}&lang=es&v=631&_=${Date.now()}`,
+    `https://cf.biwenger.com/api/v2/rounds/la-liga?score=${scoreId}&lang=es&v=${versionApp}&_=${Date.now()}`,
     { cache: "no-store" }
   );
+  if (res.status === 400 && intentosVersion < VERSIONES_MAX_REINTENTOS) {
+    if (esVersionAntigua(res.status, await res.clone().text())) {
+      versionApp += 1;
+      console.warn(`Biwenger rechaza la versión de la app ("Old version") — probando con la ${versionApp}`);
+      return getReportesRondaActual(scoreId, intentos429, intentosVersion + 1);
+    }
+  }
   // Esta es ahora LA llamada de la que depende todo el marcador en directo
   // (antes el reintento importaba poco, un jugador de ~130 fallando apenas
   // se notaba — ahora si esta falla no hay nada). Un reintento corto para
@@ -170,7 +198,7 @@ async function getReportesRondaActual(scoreId, intentos429 = 0) {
   // reintentos no van a arreglarlo y solo alargan la espera.
   if (res.status === 429 && intentos429 < 1) {
     await new Promise((r) => setTimeout(r, 300));
-    return getReportesRondaActual(scoreId, intentos429 + 1);
+    return getReportesRondaActual(scoreId, intentos429 + 1, intentosVersion);
   }
   if (!res.ok) throw new Error(`Biwenger rounds/la-liga -> ${res.status}`);
   const { data } = await res.json();
