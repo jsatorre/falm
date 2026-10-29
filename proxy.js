@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { COOKIE_NAME, equipoDeSesion } from "./app/lib/auth";
 import { ADMIN_COOKIE_NAME, esSesionAdminValida } from "./app/lib/adminAuth";
 
-const RUTAS_PUBLICAS = ["/login", "/api/auth/login", "/admin/login", "/api/admin/login"];
+// /api/cron/* no usa sesión de equipo ni de admin: lo llama un programador
+// externo y se autentica él solo con CRON_SECRET (ver app/api/cron/fichajes).
+const RUTAS_PUBLICAS = ["/login", "/api/auth/login", "/admin/login", "/api/admin/login", "/api/cron"];
 
 function esRutaPublica(pathname) {
   return RUTAS_PUBLICAS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
